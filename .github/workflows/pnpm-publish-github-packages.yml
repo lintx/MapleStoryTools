@@ -37,8 +37,8 @@ jobs:
           #cache: 'pnpm'
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
-        #with:
-        #  version: 6.0.2  # Optional: specify a pnpm version
+        with:
+          version: 8  # Optional: specify a pnpm version
       - name: Install dependencies
         run: pnpm install
       - name: Build
