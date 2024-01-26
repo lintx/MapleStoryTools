@@ -35,8 +35,8 @@ jobs:
         with:
           node-version: 18
           cache: 'pnpm'
-      #- name: Setup pnpm
-      #  uses: pnpm/action-setup@v2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
         #with:
         #  version: 6.0.2  # Optional: specify a pnpm version
       - name: Install dependencies
