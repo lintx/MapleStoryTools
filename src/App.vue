@@ -5,7 +5,6 @@ import TheWelcome from './components/TheWelcome.vue'
 
 <template>
   <header>
-
     <div class="wrapper">
       <HelloWorld msg="You did it!" />
     </div>
