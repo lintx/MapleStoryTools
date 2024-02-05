@@ -371,6 +371,14 @@ class Stat {
                 case "dex":
                     data[this.calcSource.name] = ((this.data[this.calcSource.name] - this.data[this.calcSource.name+"D"]) / (1+this.data[this.calcSource.name+"R"]/100) + this.calcSource.val) * (1+this.data[this.calcSource.name+'R']/100) + this.data[this.calcSource.name+'D']
                     break
+                case "hpD":
+                case "strD":
+                case "intD":
+                case "lukD":
+                case "dexD":
+                    let sdn = this.calcSource.name.substring(0,this.calcSource.name.length-1)
+                    data[sn] += this.calcSource.val
+                    break
                 case "hpR":
                 case "strR":
                 case "intR":
