@@ -487,29 +487,29 @@ class Stat {
                 case "3122":
                     result['strD'] = diffSt.toFixed(4)
                     result['str'] = (diffSt / (1+data['strR']/100)).toFixed(4)
-                    result['strR'] = (diffSt / (data['str'] - data['strD']) * 100).toFixed(4)
+                    result['strR'] = (diffSt / ((data['str'] - data['strD']) / (1 + data['strR']/100)) * 100).toFixed(4)
 
                     result['hpD'] = (diffSt / 0.8 * 3.5).toFixed(4)
                     result['hp'] = (diffSt / 0.8 * 3.5 / (1+data['hpR']/100)).toFixed(4)
-                    result['hpR'] = (diffSt / 0.8 * 3.5 / (data['hp'] - data['hpD']) * 100).toFixed(4)
+                    result['hpR'] = (diffSt / 0.8 * 3.5 / ((data['hp'] - data['hpD']) / (1 + data['hpR']/100)) * 100).toFixed(4)
                     break
                 case "3612":
                     for (const s of jobs[data.job].ps){
                         result[s+'D'] = (diffSt / 3).toFixed(4)
                         result[s] = (diffSt / 3 / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / 3 / (data[s] - data[s+'D']) * 100).toFixed(4)
+                        result[s+'R'] = (diffSt / 3 / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
                     }
                     break
                 default:
                     for (const s of jobs[data.job].ps){
                         result[s+'D'] = (diffSt / 4).toFixed(4)
                         result[s] = (diffSt / 4 / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / 4 / (data[s] - data[s+'D']) * 100).toFixed(4)
+                        result[s+'R'] = (diffSt / 4 / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
                     }
                     for (const s of jobs[data.job].ss){
                         result[s+'D'] = diffSt.toFixed(4)
                         result[s] = (diffSt / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / (data[s] - data[s+'D']) * 100).toFixed(4)
+                        result[s+'R'] = (diffSt / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
                     }
             }
 
