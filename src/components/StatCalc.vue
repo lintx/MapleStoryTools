@@ -173,19 +173,34 @@ function handleBack() {
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmad" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmad">
-                      </n-input-number>
+                      <n-popover trigger="hover">
+                        <template #trigger>
+                          <n-input-number min="0" v-model:value="stats.data.pmad">
+                          </n-input-number>
+                        </template>
+                        <span>填入未受%加成的{{props.pmadR}}，<br>可以由ui數值÷%得到，<br>也可以由滑鼠放上去後條目累加得到</span>
+                      </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmadR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmadR">
-                        <template #suffix>
-                          %
+                      <n-popover trigger="hover">
+                        <template #trigger>
+                          <n-input-number min="0" v-model:value="stats.data.pmadR">
+                            <template #suffix>
+                              %
+                            </template>
+                          </n-input-number>
                         </template>
-                      </n-input-number>
+                        <span>填入{{props.pmadR}}總和，<br>滑鼠放上{{props.pmadR}}後，<br>在展開的ui中可以看到</span>
+                      </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmadD" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmadD">
-                      </n-input-number>
+                      <n-popover trigger="hover">
+                        <template #trigger>
+                          <n-input-number min="0" v-model:value="stats.data.pmadD">
+                          </n-input-number>
+                        </template>
+                        <span>填入不受%加成的{{props.pmadR}}，<br>目前只有陰陽師HP轉換等少數{{props.pmadR}}不受%加成，一般職業填0即可</span>
+                      </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.bdR" :span="gis">
                       <n-input-number min="0" v-model:value="stats.data.bdR">
