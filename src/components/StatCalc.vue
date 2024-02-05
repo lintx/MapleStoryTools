@@ -294,7 +294,7 @@ function handleBack() {
                       <template #trigger>
                         防後暴B攻：{{numberFormat(stats.defBossCriticalDamage())}}
                       </template>
-                      <span>防後B攻 × (150% + 爆傷%)，按最大爆傷計算</span>
+                      <span>防後B攻 × (135% + 爆傷%)，按平均爆傷計算</span>
                     </n-popover>
                   </n-gi>
                 </n-grid>

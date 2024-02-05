@@ -344,7 +344,7 @@ class Stat {
             }
             const damage = this.defBossDamage().value
             if (typeof damage==="string") return damage
-            return Math.floor(damage * ( 1.5 + this.data.cdR / 100))
+            return Math.floor(damage * ( 1.35 + this.data.cdR / 100))
         })
     }
     calcSourceResult(){
@@ -423,7 +423,7 @@ class Stat {
             const defBDamage = Math.max(Math.floor(bDamage * remainingDef),0)
 
             //計算加權後的防後暴B功
-            const defBossCriticalDamage = Math.floor(defBDamage * ( 1.5 + data.cdR / 100))
+            const defBossCriticalDamage = Math.floor(defBDamage * ( 1.35 + data.cdR / 100))
 
             //計算提升攻擊（提升後的防後暴B功 - 提升前的防後暴B功）
             const diff = defBossCriticalDamage - this.defBossCriticalDamage().value
@@ -433,7 +433,7 @@ class Stat {
             result.cdR = (diff / defBDamage * 100).toFixed(4)
 
             //計算提升的防後B功(等於b功 * 減去無視防禦後實際能打的傷害部分)
-            const diffDefBDamage = diff / ( 1.5 + data.cdR / 100)
+            const diffDefBDamage = diff / ( 1.35 + data.cdR / 100)
             //提升的無視防禦率
             result.imdR = ((diffDefBDamage / bDamage) / (this.def / 100) / ( 1 - this.calcImdr().value/100) * 100).toFixed(4)
             //b功 （等於真攻 * （1+傷害+b傷） * （1+終傷））
