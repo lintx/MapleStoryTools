@@ -14,7 +14,7 @@ const router = useRouter()
 const message = useMessage()
 
 let stopSw = null
-let index = ref(null),stats = ref(null),showName = ref(null),imdrRef = ref(null),calcSource = ref(null)
+let index = ref(null),stats = ref(null),showName = ref(null),calcSource = ref(null)
 function parseIndex(){
   stopSw !== null && stopSw
   index.value = parseInt(route.params.index)
@@ -27,7 +27,6 @@ function parseIndex(){
   calcSource.value = stats.value.calcSource
   // console.log(stats)
   showName.value = stats.value.showName()
-  imdrRef.value = stats.value.calcImdr()
   stopSw = watch(stats.value.data,()=>{
     store.save()
   })
@@ -244,7 +243,7 @@ function handleBack() {
                   </n-grid>
                 </n-space>
                 <template #header-extra>
-                  {{imdrRef.value}}%
+                  {{stats.calcData().value.imdr}}%
                 </template>
               </n-collapse-item>
               <n-collapse-item title="主副屬" name="4">
@@ -324,7 +323,7 @@ function handleBack() {
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        表攻：{{numberFormat(stats.displayDamage())}}
+                        表攻：{{numberFormat(stats.calcData().value.dDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害%) × (100% + 總傷%)</span>
                     </n-popover>
@@ -332,15 +331,15 @@ function handleBack() {
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        真攻：{{numberFormat(stats.realDamage())}}
+                        真攻：{{numberFormat(stats.calcData().value.damage)}}
                       </template>
-                      <span>武器係數({{stats.data.job===null?'-':jobs[stats.data.job].wm}}) × 屬性加權({{stats.statWeight().value}}) × 總攻擊力({{Math.floor(stats.data.pmad * (1+stats.data.pmadR/100))}}) ÷ 100</span>
+                      <span>武器係數({{stats.data.job===null?'-':jobs[stats.data.job].wm}}) × 屬性加權({{stats.calcData().value.st}}) × 總攻擊力({{Math.floor(stats.data.pmad * (1+stats.data.pmadR/100))}}) ÷ 100</span>
                     </n-popover>
                   </n-gi>
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        B攻：{{numberFormat(stats.bossDamage())}}
+                        B攻：{{numberFormat(stats.calcData().value.bDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害% + B傷%) × (100% + 總傷%)</span>
                     </n-popover>
@@ -355,15 +354,15 @@ function handleBack() {
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        防後B攻：{{numberFormat(stats.defBossDamage())}}
+                        防後B攻：{{numberFormat(stats.calcData().value.defBDamage)}}
                       </template>
-                      <span>無視：{{imdrRef.value.toFixed(2)}}%，剩餘防禦：{{(100 - stats.remainingDef().value * 100).toFixed(2)}}%<br />B攻 × (100% - 剩餘防禦%)</span>
+                      <span>無視：{{stats.calcData().value.imdr.toFixed(2)}}%，剩餘防禦：{{(100 - stats.calcData().value.remainingDef * 100).toFixed(2)}}%<br />B攻 × (100% - 剩餘防禦%)</span>
                     </n-popover>
                   </n-gi>
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        防後暴B攻：{{numberFormat(stats.defBossCriticalDamage())}}
+                        防後暴B攻：{{numberFormat(stats.calcData().value.defBossCriticalDamage)}}
                       </template>
                       <span>防後B攻 × (135% + 爆傷%)，按平均爆傷計算</span>
                     </n-popover>

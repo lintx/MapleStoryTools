@@ -283,101 +283,16 @@ class Stat {
             return `${this.data.level}等${this.data.job===null?`無職業`:jobs[this.data.job]["name"]}`
         })
     }
-    calcImdr(){
+    calcData(){
         return computed(()=>{
-            let val = 100
-            for (const v of this.data.imdR){
-                val *= (100-v)/100
-            }
-            return 100-val
-        })
-    }
-    statWeight(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            let st = 0//屬性
-            switch (this.data.job) {
-                case "3122":
-                    let chp = 545 + 90 * this.data.level
-                    st = Math.floor(chp / 3.5) + 0.8 * Math.floor((this.data.hp - chp) / 3.5) + this.data.str
-                    break
-                case "3612":
-                    st = (this.data.str + this.data.luk + this.data.dex) * 3
-                    break
-                default:
-                    for (const s of jobs[this.data.job].ps){
-                        st += this.data[s] * 4
-                    }
-                    for (const s of jobs[this.data.job].ss){
-                        st += this.data[s]
-                    }
-            }
-            return st
-        })
-    }
-    realDamage(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            const wm = jobs[this.data.job].wm
-            let st = this.statWeight().value
-            if (typeof st==="string") return st
-            return Math.floor(wm * st * Math.floor(this.data.pmad * (1+this.data.pmadR/100) + data.pmadD) / 100)
-        })
-    }
-    displayDamage(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            const damage = this.realDamage().value
-            if (typeof damage==="string") return damage
-            return Math.floor(damage * (1+this.data.damR/100) * (1+this.data.pmdR/100))
-        })
-    }
-    bossDamage(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            const damage = this.realDamage().value
-            if (typeof damage==="string") return damage
-            return Math.floor(damage * (1+this.data.damR/100+this.data.bdR/100) * (1+this.data.pmdR/100))
-        })
-    }
-    remainingDef(){
-        return computed(()=>{
-            return 1 - ( 1 - this.calcImdr().value/100) * this.def/100
-        })
-    }
-    defBossDamage(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            const damage = this.bossDamage().value
-            if (typeof damage==="string") return damage
-            const result = Math.floor(damage * this.remainingDef().value)
-            return Math.max(result,0)
-        })
-    }
-    defBossCriticalDamage(){
-        return computed(()=>{
-            if (!jobs.hasOwnProperty(this.data.job)){
-                return "請選擇職業"
-            }
-            const damage = this.defBossDamage().value
-            if (typeof damage==="string") return damage
-            return Math.floor(damage * ( 1.35 + this.data.cdR / 100))
+            return this.calcNewData(this.data)
         })
     }
     calcNewData(data){
         const result = {
             st:0,   //加權後屬性
             wm:0,   //武器係數
+            imdr:0, //無視
             damage:0,   //真攻
             bDamage:0,  //b功
             dDamage:0,  //表功
@@ -390,11 +305,11 @@ class Stat {
         }
 
         //計算無視
-        let imdr = 100
+        let mdr = 100
         for (const v of data.imdR){
-            imdr *= (100-v)/100
+            mdr *= (100-v)/100
         }
-        result.imdr = 100 - imdr
+        result.imdr = 100 - mdr
 
         //計算屬性
         switch (data.job) {
@@ -492,7 +407,7 @@ class Stat {
             //計算提升的防後B功(等於b功 * 減去無視防禦後實際能打的傷害部分)
             const diffDefBDamage = diff / ( 1.35 + this.data.cdR / 100)
             //提升的無視防禦率
-            result.imdR = formatFloat(((diffDefBDamage / beforeResult.bDamage) / (this.def / 100) / ( 1 - this.calcImdr().value/100) * 100))
+            result.imdR = formatFloat(((diffDefBDamage / beforeResult.bDamage) / (this.def / 100) / ( 1 - beforeResult.imdr/100) * 100))
             //b功 （等於真攻 * （1+傷害+b傷） * （1+終傷））
             const diffBDamage = diffDefBDamage / beforeResult.remainingDef
             //傷害/b傷
