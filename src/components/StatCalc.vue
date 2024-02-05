@@ -49,28 +49,11 @@ for (const item of jobGroups){
     children: [],
   }
   for (const cItem of item.child){
-    if (typeof cItem==="number"){
-      let key = cItem.toString()
-      child.children.push({
-        label: jobs[key].name,
-        value: key
-      })
-    }else if (typeof cItem==="object"){
-      const cChild = {
-        type: "group",
-        label: cItem.name,
-        key: item.name + "-" + cItem.name,
-        children: [],
-      }
-      for (const cCItem of cItem.child){
-        let key = cCItem.toString()
-        cChild.children.push({
-          label: jobs[key].name,
-          value: key
-        })
-      }
-      child.children.push(cChild)
-    }
+    let key = cItem.toString()
+    child.children.push({
+      label: jobs[key].name,
+      value: key
+    })
   }
   jobOptions.push(child)
 }
