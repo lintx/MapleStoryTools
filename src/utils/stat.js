@@ -258,6 +258,11 @@ export function exportData(d) {
     return arr.join(",")
 }
 
+function formatFloat(val){
+    if (typeof val!=="number") return val
+    if (!Number.isFinite(val)) return "∞"
+    return Math.round(val * 10000) / 10000
+}
 
 class Stat {
     data
@@ -369,6 +374,67 @@ class Stat {
             return Math.floor(damage * ( 1.35 + this.data.cdR / 100))
         })
     }
+    calcNewData(data){
+        const result = {
+            st:0,   //加權後屬性
+            wm:0,   //武器係數
+            damage:0,   //真攻
+            bDamage:0,  //b功
+            dDamage:0,  //表功
+            remainingDef:0, //有效傷害比
+            defBDamage:0,   //有效b功
+            defBossCriticalDamage:0,    //有效爆功
+        }
+        if (!jobs.hasOwnProperty(this.data.job)){
+            return result
+        }
+
+        //計算無視
+        let imdr = 100
+        for (const v of data.imdR){
+            imdr *= (100-v)/100
+        }
+        result.imdr = 100 - imdr
+
+        //計算屬性
+        switch (data.job) {
+            case "3122":
+                let chp = 545 + 90 * data.level
+                result.st = Math.floor(chp / 3.5) + 0.8 * Math.floor((data.hp - chp) / 3.5) + data.str
+                break
+            case "3612":
+                result.st = (data.str + data.luk + data.dex) * 3
+                break
+            default:
+                for (const s of jobs[data.job].ps){
+                    result.st += data[s] * 4
+                }
+                for (const s of jobs[data.job].ss){
+                    result.st += data[s]
+                }
+        }
+
+        //計算真功
+        result.wm = jobs[data.job].wm
+        result.damage = Math.floor(result.wm * result.st * Math.floor(data.pmad * (1+data.pmadR/100) + data.pmadD) / 100)
+
+        //表功
+        result.dDamage = Math.floor(result.damage * (1+data.damR/100) * (1+data.pmdR/100))
+
+        //b功
+        result.bDamage = Math.floor(result.damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
+
+        //防禦後有效傷害部分
+        result.remainingDef = 1 - ( 1 - result.imdr/100) * this.def/100
+
+        //計算防後B功
+        result.defBDamage = Math.max(Math.floor(result.bDamage * result.remainingDef),0)
+
+        //計算防後暴B功
+        result.defBossCriticalDamage = Math.floor(result.defBDamage * ( 1.35 + data.cdR / 100))
+
+        return result
+    }
     calcSourceResult(){
         return computed(()=>{
             const data = dupeObj(this.data)
@@ -413,103 +479,64 @@ class Stat {
                     data[this.calcSource.name] += this.calcSource.val
             }
 
-            //計算加權後的無視
-            let imdr = 100
-            for (const v of data.imdR){
-                imdr *= (100-v)/100
-            }
-            imdr = 100 - imdr
-
-            //計算加權後的屬性
-            let st = 0
-            switch (data.job) {
-                case "3122":
-                    let chp = 545 + 90 * data.level
-                    st = Math.floor(chp / 3.5) + 0.8 * Math.floor((data.hp - chp) / 3.5) + data.str
-                    break
-                case "3612":
-                    st = (data.str + data.luk + data.dex) * 3
-                    break
-                default:
-                    for (const s of jobs[data.job].ps){
-                        st += data[s] * 4
-                    }
-                    for (const s of jobs[data.job].ss){
-                        st += data[s]
-                    }
-            }
-
-            //計算加權後的真功
-            const wm = jobs[data.job].wm
-            const damage = Math.floor(wm * st * Math.floor(data.pmad * (1+data.pmadR/100) + data.pmadD) / 100)
-
-            //加權後的b功
-            const bDamage = Math.floor(damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
-
-            //加權後防禦後有效傷害部分
-            const remainingDef = 1 - ( 1 - imdr/100) * this.def/100
-
-            //計算加權後的防後B功
-            const defBDamage = Math.max(Math.floor(bDamage * remainingDef),0)
-
-            //計算加權後的防後暴B功
-            const defBossCriticalDamage = Math.floor(defBDamage * ( 1.35 + data.cdR / 100))
+            const beforeResult = this.calcNewData(this.data)
+            const afterResult = this.calcNewData(data)
 
             //計算提升攻擊（提升後的防後暴B功 - 提升前的防後暴B功）
-            const diff = defBossCriticalDamage - this.defBossCriticalDamage().value
+            const diff = afterResult.defBossCriticalDamage - beforeResult.defBossCriticalDamage
 
-            if (defBDamage===0) return result
+            if (afterResult.defBDamage===0) return result
             //計算爆傷比例
-            result.cdR = (diff / defBDamage * 100).toFixed(4)
+            result.cdR = formatFloat((diff / beforeResult.defBDamage * 100))
 
             //計算提升的防後B功(等於b功 * 減去無視防禦後實際能打的傷害部分)
-            const diffDefBDamage = diff / ( 1.35 + data.cdR / 100)
+            const diffDefBDamage = diff / ( 1.35 + this.data.cdR / 100)
             //提升的無視防禦率
-            result.imdR = ((diffDefBDamage / bDamage) / (this.def / 100) / ( 1 - this.calcImdr().value/100) * 100).toFixed(4)
+            result.imdR = formatFloat(((diffDefBDamage / beforeResult.bDamage) / (this.def / 100) / ( 1 - this.calcImdr().value/100) * 100))
             //b功 （等於真攻 * （1+傷害+b傷） * （1+終傷））
-            const diffBDamage = diffDefBDamage / remainingDef
+            const diffBDamage = diffDefBDamage / beforeResult.remainingDef
             //傷害/b傷
-            result.damR = result.bdR = (diffBDamage / damage / (1+data.pmdR/100) * 100).toFixed(4)
+            result.damR = result.bdR = formatFloat((diffBDamage / beforeResult.damage / (1+this.data.pmdR/100) * 100))
             //終傷
-            result.pmdR = (diffBDamage / damage / (1+data.damR/100+data.bdR/100) * 100).toFixed(4)
+            result.pmdR = formatFloat((diffBDamage / beforeResult.damage / (1+this.data.damR/100+this.data.bdR/100) * 100))
             //真攻 （等於 武器係數 * 屬性 * 攻擊 / 100）
-            const diffDamage = diffBDamage / (1+data.pmdR/100) / (1+data.damR/100+data.bdR/100)
+            const diffDamage = diffBDamage / (1+this.data.pmdR/100) / (1+this.data.damR/100+this.data.bdR/100)
             //便於計算的真攻 （等於 屬性 * 攻擊）
-            const diffRDamage = diffDamage / wm * 100
+            const diffRDamage = diffDamage / beforeResult.wm * 100
             //最終攻擊
-            const pmadD = diffRDamage / st
-            result.pmadD = pmadD.toFixed(4)
-            result.pmad = (pmadD / (1+data.pmadR/100)).toFixed(4)
-            result.pmadR = (pmadD / data.pmad * 100).toFixed(4)
+            const pmadD = diffRDamage / beforeResult.st
+            result.pmadD = formatFloat(pmadD)
+            result.pmad = formatFloat((pmadD / (1+this.data.pmadR/100)))
+            result.pmadR = formatFloat((pmadD / this.data.pmad * 100))
             //st
-            const diffSt = diffRDamage / Math.floor(data.pmad * (1+data.pmadR/100) + data.pmadD)
+            const diffSt = diffRDamage / Math.floor(this.data.pmad * (1+this.data.pmadR/100) + this.data.pmadD)
             switch (data.job) {
                 case "3122":
-                    result['strD'] = diffSt.toFixed(4)
-                    result['str'] = (diffSt / (1+data['strR']/100)).toFixed(4)
-                    result['strR'] = (diffSt / ((data['str'] - data['strD']) / (1 + data['strR']/100)) * 100).toFixed(4)
+                    result['strD'] = formatFloat(diffSt)
+                    result['str'] = formatFloat((diffSt / (1+this.data['strR']/100)))
+                    result['strR'] = formatFloat((diffSt / ((this.data['str'] - this.data['strD']) / (1 + this.data['strR']/100)) * 100))
 
-                    result['hpD'] = (diffSt / 0.8 * 3.5).toFixed(4)
-                    result['hp'] = (diffSt / 0.8 * 3.5 / (1+data['hpR']/100)).toFixed(4)
-                    result['hpR'] = (diffSt / 0.8 * 3.5 / ((data['hp'] - data['hpD']) / (1 + data['hpR']/100)) * 100).toFixed(4)
+                    result['hpD'] = formatFloat((diffSt / 0.8 * 3.5))
+                    result['hp'] = formatFloat((diffSt / 0.8 * 3.5 / (1+this.data['hpR']/100)))
+                    result['hpR'] = formatFloat((diffSt / 0.8 * 3.5 / ((this.data['hp'] - this.data['hpD']) / (1 + this.data['hpR']/100)) * 100))
                     break
                 case "3612":
                     for (const s of jobs[data.job].ps){
-                        result[s+'D'] = (diffSt / 3).toFixed(4)
-                        result[s] = (diffSt / 3 / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / 3 / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
+                        result[s+'D'] = formatFloat((diffSt / 3))
+                        result[s] = formatFloat((diffSt / 3 / (1+this.data[s+'R']/100)))
+                        result[s+'R'] = formatFloat((diffSt / 3 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
                     }
                     break
                 default:
                     for (const s of jobs[data.job].ps){
-                        result[s+'D'] = (diffSt / 4).toFixed(4)
-                        result[s] = (diffSt / 4 / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / 4 / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
+                        result[s+'D'] = formatFloat((diffSt / 4))
+                        result[s] = formatFloat((diffSt / 4 / (1+this.data[s+'R']/100)))
+                        result[s+'R'] = formatFloat((diffSt / 4 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
                     }
                     for (const s of jobs[data.job].ss){
-                        result[s+'D'] = diffSt.toFixed(4)
-                        result[s] = (diffSt / (1+data[s+'R']/100)).toFixed(4)
-                        result[s+'R'] = (diffSt / ((data[s] - data[s+'D']) / (1 + data[s+'R']/100)) * 100).toFixed(4)
+                        result[s+'D'] = formatFloat(diffSt)
+                        result[s] = formatFloat((diffSt / (1+this.data[s+'R']/100)))
+                        result[s+'R'] = formatFloat((diffSt / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
                     }
             }
 
