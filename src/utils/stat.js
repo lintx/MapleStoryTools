@@ -377,7 +377,7 @@ class Stat {
                 case "lukD":
                 case "dexD":
                     let sdn = this.calcSource.name.substring(0,this.calcSource.name.length-1)
-                    data[sn] += this.calcSource.val
+                    data[sdn] += this.calcSource.val
                     break
                 case "hpR":
                 case "strR":
