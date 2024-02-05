@@ -8,6 +8,7 @@ const route = useRoute()
 const router = useRouter()
 const stats = ref(store.stats())
 const message = useMessage()
+const dialog = useDialog();
 
 function parseImport(){
   if (route.params.importData !== undefined){
@@ -44,6 +45,14 @@ const shareLink = computed(()=>{
   }
 })
 
+function showLink(item) {
+  dialog.info({
+    title:'檔案連接',
+    content:shareLink.value(item),
+    positiveText:'好',
+  })
+}
+
 </script>
 
 <template>
@@ -55,12 +64,7 @@ const shareLink = computed(()=>{
         <n-space justify="space-between">
           <n-button text size="large" @click="open(index)">{{item.showName().value}}</n-button>
           <n-space justify="end">
-            <n-popover trigger="click">
-              <template #trigger>
-                <n-button text>分享</n-button>
-              </template>
-              <span>{{shareLink(item)}}</span>
-            </n-popover>
+            <n-button @click="showLink(item)" text>分享</n-button>
             <n-popconfirm
                 @positive-click="stats.splice(index,1) ; store.save()"
                 negative-text="不"
