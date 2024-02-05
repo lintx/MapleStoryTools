@@ -2,6 +2,7 @@
 import * as stat from "@/utils/stat.js";
 import {useRoute, useRouter} from "vue-router";
 import {useMessage} from "naive-ui";
+import {Delete} from "@vicons/carbon";
 
 const store = stat.getStore()
 const jobs = stat.getJobs()
@@ -91,7 +92,7 @@ function statLabel(s) {
       desc = "[副屬]"
     }
   }
-  return `${props[s]}${desc}（乾淨屬性、吃藥增加量、吃藥後屬性、最終屬性、屬性%）`
+  return `${props[s]}${desc}`
 }
 
 const numberFormat = computed(()=>{
@@ -207,20 +208,24 @@ function handleBack() {
                         增加無視防禦率
                       </n-button>
                     </n-form-item-gi>
-                    <n-form-item-gi
-                        v-for="(item, index) in stats.data.imdR"
-                        :label="`${props.imdR}${index + 1}`"
-                        :span="gis"
-                    >
-                      <n-input-number min="0" max="100" v-model:value="stats.data.imdR[index]">
-                        <template #suffix>
-                          %
-                        </template>
-                      </n-input-number>
-                      <n-button style="margin-left: 12px" @click="stats.data.imdR.splice(index, 1)">
-                        刪除
-                      </n-button>
-                    </n-form-item-gi>
+                    <template v-for="(item, index) in stats.data.imdR">
+                      <n-form-item-gi :label="`${props.imdR}${index + 1}`" :span="gis">
+                        <n-input-group>
+                          <n-input-number min="0" max="100" v-model:value="stats.data.imdR[index]">
+                            <template #suffix>
+                              %
+                            </template>
+                          </n-input-number>
+                          <n-button style="margin-left: 12px" @click="stats.data.imdR.splice(index, 1)">
+                            <template #icon>
+                              <n-icon>
+                                <Delete />
+                              </n-icon>
+                            </template>
+                          </n-button>
+                        </n-input-group>
+                      </n-form-item-gi>
+                    </template>
                   </n-grid>
                 </n-space>
                 <template #header-extra>
@@ -237,22 +242,56 @@ function handleBack() {
                     <template v-for="s in ['hp','str','int','luk','dex']">
                       <n-form-item-gi :label="statLabel(s)" span="24" v-if="statIsShow(s)">
                         <n-input-group>
-                          <n-input-number v-model:value="stats.data[s]" :placeholder="props[s]" />
-                          <n-input-number v-model:value="stats.data['inc'+s]" :placeholder="props['inc'+s]">
-                            <template v-if="s==='hp'" #suffix>
-                              %
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data[s]" />
                             </template>
-                          </n-input-number>
-                          <n-input-number v-model:value="stats.data[s+'A']" :placeholder="props[s+'A']" />
-                          <n-input-number v-model:value="stats.data[s+'D']" :placeholder="props[s+'D']" />
-                          <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
-                            <template #suffix>
-                              %
+                            <span>填入吃藥前ui上顯示的{{props[s]}}</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data['inc'+s]">
+                                <template v-if="s==='hp'" #suffix>
+                                  %
+                                </template>
+                              </n-input-number>
                             </template>
-                          </n-input-number>
-                          <n-button @click="calcSP(s)">
-                            重算%
-                          </n-button>
+                            <span>填入吃藥增加的{{props[s]}}量(惡復填入增加%)</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data[s+'A']" />
+                            </template>
+                            <span>填入吃藥後ui上顯示的{{props[s]}}</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data[s+'D']" />
+                            </template>
+                            <span>填入不受%加成的{{props[s]}}，<br>來源有ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性等<br>（惡復極限屬性受%加成）</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
+                                <template #suffix>
+                                  %
+                                </template>
+                              </n-input-number>
+                            </template>
+                            <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-button @click="calcSP(s)">
+                                重算%
+                              </n-button>
+                            </template>
+                            <span>
+                              根據前面數據及公式推算{{props[s]}}%，公式：<br>
+                              四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
+                              hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
+                            </span>
+                          </n-popover>
                         </n-input-group>
                       </n-form-item-gi>
                     </template>
