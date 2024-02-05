@@ -81,6 +81,23 @@ const propNames = {
 }
 const data = v1
 
+const jobGroups = [
+    {name:"冒險家",child:[{name:"劍士",child:[1121,1122,1221,1222,132]},{name:"法師",child:[212,222,232]},{name:"弓手",child:[322,312,332]},{name:"盜賊",child:[412,422,434]},{name:"海盜",child:[512,522,532]}]},
+    {name:"騎士團",child:[11121,11122,1212,1312,1412,1512,5112]},
+    {name:"反抗軍",child:[3312,3512,3212,3712,3112,3122,3612]},
+    {name:"英雄團",child:[2217,2312,2112,2712,2412,2512]},
+    {name:"超新星",child:[6512,6112,6412,6312]},
+    {name:"雷普族",child:[15212,15512,15112,15412]},
+    {name:"阿尼瑪",child:[16412,16212]},
+    {name:"曉之陣",child:[4112,4212]},
+    {name:"武神",child:[17512]},
+    {name:"其他",child:[101121,101122,14212]},
+]
+
+export function getJobGroups(){
+    return jobGroups
+}
+
 const jobs = {
     1121:{name:"英雄(單手武器)",wm:1.3,ps:["str"],ss:["dex"]},
     1122:{name:"英雄(雙手武器)",wm:1.44,ps:["str"],ss:["dex"]},
@@ -126,6 +143,7 @@ const jobs = {
     15212:{name:"伊利恩",wm:1.2,ps:["int"],ss:["luk"]},
     15512:{name:"亞克",wm:1.7,ps:["str"],ss:["dex"]},
     15112:{name:"阿戴爾",wm:1.3,ps:["str"],ss:["dex"]},
+    15412:{name:"卡莉",wm:1.3,ps:["luk"],ss:["dex"]},
     101121:{name:"神之子(琉)",wm:1.49,ps:["str"],ss:["dex"]},
     101122:{name:"神之子(璃)",wm:1.34,ps:["str"],ss:["dex"]},
     14212:{name:"凱內西斯",wm:1.2,ps:["int"],ss:["luk"]},

@@ -5,6 +5,7 @@ import {useMessage} from "naive-ui";
 
 const store = stat.getStore()
 const jobs = stat.getJobs()
+const jobGroups = stat.getJobGroups()
 const props = stat.getPropNames()
 const calcStats = stat.getCalcStats()
 const route = useRoute()
@@ -38,8 +39,41 @@ watch(
 )
 parseIndex()
 const gis = "xs:24 s:12 m:8 l:6 xl:4 xxl:4"
-const jobOptions = Object.keys(jobs).map(k=>{return {label:jobs[k].name,value:k}})
 const calcStatsOptions = Object.keys(calcStats).map(k=>{return {label:props[k],value:k}})
+const jobOptions = []
+for (const item of jobGroups){
+  const child = {
+    type: "group",
+    label: item.name,
+    key: item.name,
+    children: [],
+  }
+  for (const cItem of item.child){
+    if (typeof cItem==="number"){
+      let key = cItem.toString()
+      child.children.push({
+        label: jobs[key].name,
+        value: key
+      })
+    }else if (typeof cItem==="object"){
+      const cChild = {
+        type: "group",
+        label: cItem.name,
+        key: item.name + "-" + cItem.name,
+        children: [],
+      }
+      for (const cCItem of cItem.child){
+        let key = cCItem.toString()
+        cChild.children.push({
+          label: jobs[key].name,
+          value: key
+        })
+      }
+      child.children.push(cChild)
+    }
+  }
+  jobOptions.push(child)
+}
 
 function calcSP(t) {
   if (stats.value.data["inc"+t]===0) {
@@ -118,7 +152,7 @@ function handleBack() {
                   <n-form-item-gi :label="props.level" :span="gis">
                     <n-input-number min="0" max="300" v-model:value="stats.data.level" />
                   </n-form-item-gi>
-                  <n-form-item-gi :label="props.level" :span="gis">
+                  <n-form-item-gi :label="props.job" :span="gis">
                     <n-select
                         v-model:value="stats.data.job"
                         placeholder="請選擇職業/武器"
