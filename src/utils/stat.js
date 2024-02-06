@@ -63,6 +63,7 @@ const propNames = {
     intA:"吃藥後int",
     lukA:"吃藥後luk",
     hpA:"吃藥後hp",
+    atR:'全屬%',
     strR:"str%",
     dexR:"dex%",
     intR:"int%",
@@ -171,6 +172,7 @@ const calcStats = {
     int:0,
     luk:0,
     hp:0,
+    atR:0,
     strR:0,
     dexR:0,
     intR:0,
@@ -357,10 +359,12 @@ class Stat {
                 data.imdR.push(v)
             }
             const result = dupeObj(calcStats)
+            result.diff = 0
+            result.dDamage = 0
             if (!jobs.hasOwnProperty(this.data.job)){
                 return result
             }
-            if (!result.hasOwnProperty(this.calcSource.name)){
+            if (!result.hasOwnProperty(this.calcSource.name) && this.calcSource.name!=='atR'){
                 return result
             }
             switch (this.calcSource.name) {
@@ -390,6 +394,11 @@ class Stat {
                     let sn = this.calcSource.name.substring(0,this.calcSource.name.length-1)
                     data[sn] = ((this.data[sn] - this.data[sn+"D"]) / (1+this.data[sn+"R"]/100)) * (1+(this.data[sn+'R'] + this.calcSource.val)/100) + this.data[sn+'D']
                     break
+                case "atR":
+                    for (const san of ['str','int','luk','dex']){
+                        data[san] = ((this.data[san] - this.data[san+"D"]) / (1+this.data[san+"R"]/100)) * (1+(this.data[san+'R'] + this.calcSource.val)/100) + this.data[san+'D']
+                    }
+                    break
                 default:
                     data[this.calcSource.name] += this.calcSource.val
             }
@@ -399,6 +408,7 @@ class Stat {
 
             //計算提升攻擊（提升後的防後暴B功 - 提升前的防後暴B功）
             const diff = afterResult.defBossCriticalDamage - beforeResult.defBossCriticalDamage
+            result['diff'] = diff
 
             if (afterResult.defBDamage===0) return result
             //計算爆傷比例
@@ -410,6 +420,8 @@ class Stat {
             result.imdR = formatFloat(((diffDefBDamage / beforeResult.bDamage) / (this.def / 100) / ( 1 - beforeResult.imdr/100) * 100))
             //b功 （等於真攻 * （1+傷害+b傷） * （1+終傷））
             const diffBDamage = diffDefBDamage / beforeResult.remainingDef
+            //表功
+            result.dDamage = formatFloat(Math.floor(diffBDamage / (1+this.data.damR/100+this.data.bdR/100) * (1+this.data.damR/100)))
             //傷害/b傷
             result.damR = result.bdR = formatFloat((diffBDamage / beforeResult.damage / (1+this.data.pmdR/100) * 100))
             //終傷
@@ -425,6 +437,7 @@ class Stat {
             result.pmadR = formatFloat((pmadD / this.data.pmad * 100))
             //st
             const diffSt = diffRDamage / Math.floor(this.data.pmad * (1+this.data.pmadR/100) + this.data.pmadD)
+            let aSt = 0
             switch (data.job) {
                 case "3122":
                     result['strD'] = formatFloat(diffSt)
@@ -434,12 +447,17 @@ class Stat {
                     result['hpD'] = formatFloat((diffSt / 0.8 * 3.5))
                     result['hp'] = formatFloat((diffSt / 0.8 * 3.5 / (1+this.data['hpR']/100)))
                     result['hpR'] = formatFloat((diffSt / 0.8 * 3.5 / ((this.data['hp'] - this.data['hpD']) / (1 + this.data['hpR']/100)) * 100))
+
+                    aSt += (this.data['str'] - this.data['strD']) / (1 + this.data['strR']/100)
                     break
                 case "3612":
                     for (const s of jobs[data.job].ps){
                         result[s+'D'] = formatFloat((diffSt / 3))
                         result[s] = formatFloat((diffSt / 3 / (1+this.data[s+'R']/100)))
                         result[s+'R'] = formatFloat((diffSt / 3 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+
+                        // diffAtSt -= (this.data[s] - this.data[s+'D']) * 3
+                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100) * 3
                     }
                     break
                 default:
@@ -447,13 +465,18 @@ class Stat {
                         result[s+'D'] = formatFloat((diffSt / 4))
                         result[s] = formatFloat((diffSt / 4 / (1+this.data[s+'R']/100)))
                         result[s+'R'] = formatFloat((diffSt / 4 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+
+                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100) * 4
                     }
                     for (const s of jobs[data.job].ss){
                         result[s+'D'] = formatFloat(diffSt)
                         result[s] = formatFloat((diffSt / (1+this.data[s+'R']/100)))
                         result[s+'R'] = formatFloat((diffSt / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+
+                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)
                     }
             }
+            result['atR'] = formatFloat(diffSt / aSt * 100)
 
             return result
         })

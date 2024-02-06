@@ -37,9 +37,25 @@ watch(
       parseIndex()
     }
 )
+const statNames = ['hp','str','int','luk','dex']
+const statRNames = statNames.map(n=>n+'R')
 parseIndex()
 const gis = "xs:24 s:12 m:8 l:6 xl:4 xxl:4"
-const calcStatsOptions = Object.keys(calcStats).map(k=>{return {label:props[k],value:k}})
+// const calcStatsOptions = Object.keys(calcStats).map(k=>{return {label:props[k],value:k}})
+const calcStatsOptions = computed(()=>{
+  const result = []
+  Object.keys(calcStats).forEach(k=>{
+    const option = {label:props[k],value:k}
+    if (statNames.indexOf(k)>=0){
+      if (statIsShow(k)) result.push(option)
+    }else if (statRNames.indexOf(k)>=0){
+      if (statIsShow(k.substring(0,k.length-1))) result.push(option)
+    }else {
+      result.push(option)
+    }
+  })
+  return result
+})
 const jobOptions = []
 for (const item of jobGroups){
   const child = {
@@ -253,7 +269,7 @@ function handleBack() {
                     對於惡復，應在正確填寫其他屬性後，使用三轉技能“急速療癒”或五轉技能“聖火”以增加hp%，並在吃藥增加的屬性中填寫對應的%數（25%或40%），填寫增加後的hp總量，然後點擊重算即可。
                   </n-alert>
                   <n-grid item-responsive responsive="screen">
-                    <template v-for="s in ['hp','str','int','luk','dex']">
+                    <template v-for="s in statNames">
                       <n-form-item-gi :label="statLabel(s)" span="24" v-if="statIsShow(s)">
                         <n-input-group>
                           <n-popover trigger="hover">
@@ -394,13 +410,26 @@ function handleBack() {
                       </n-input-group>
                     </n-form-item-gi>
 
-                    <template  v-for="s in ['hp','str','int','luk','dex']">
+                    <n-gi :span="gis">
+                      <n-popover trigger="hover">
+                        <template #trigger>防後爆B攻：{{stats.calcSourceResult().value.diff}}</template>
+                        <span>提升{{calcSource.val}}{{calcSource.name.charAt(calcSource.name.length-1)==='R'?'%':''}}{{props[calcSource.name]}}後增加的防後爆B攻</span>
+                      </n-popover>
+                    </n-gi>
+                    <n-gi :span="gis">
+                      <n-popover trigger="hover">
+                        <template #trigger>表攻：{{stats.calcSourceResult().value.dDamage}}</template>
+                        <span>提升{{calcSource.val}}{{calcSource.name.charAt(calcSource.name.length-1)==='R'?'%':''}}{{props[calcSource.name]}}後增加的表攻</span>
+                      </n-popover>
+                    </n-gi>
+                    <template  v-for="s in statNames">
                       <template v-if="statIsShow(s)">
                         <n-gi :span="gis">{{props[s]}}：{{stats.calcSourceResult().value[s]}}</n-gi>
                         <n-gi :span="gis">{{props[s+'R']}}：{{stats.calcSourceResult().value[s+'R']}}%</n-gi>
                         <n-gi :span="gis">{{props[s+'D']}}：{{stats.calcSourceResult().value[s+'D']}}</n-gi>
                       </template>
                     </template>
+                    <n-gi :span="gis">{{props.atR}}：{{stats.calcSourceResult().value.atR}}%</n-gi>
                     <n-gi :span="gis">{{props.pmad}}：{{stats.calcSourceResult().value.pmad}}</n-gi>
                     <n-gi :span="gis">{{props.pmadR}}：{{stats.calcSourceResult().value.pmadR}}%</n-gi>
                     <n-gi :span="gis">{{props.pmadD}}：{{stats.calcSourceResult().value.pmadD}}</n-gi>
