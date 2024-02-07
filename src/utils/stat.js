@@ -352,12 +352,50 @@ class Stat {
 
         return result
     }
+    addStat(source,name,val){
+        const data = dupeObj(source)
+        for (const v of source.imdR){
+            data.imdR.push(v)
+        }
+        switch (name) {
+            case "imdR":
+                data[name].push(val)
+                break
+            case "hp":
+            case "str":
+            case "int":
+            case "luk":
+            case "dex":
+                data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
+                break
+            case "hpD":
+            case "strD":
+            case "intD":
+            case "lukD":
+            case "dexD":
+                let sdn = name.substring(0,name.length-1)
+                data[sdn] += val
+                break
+            case "hpR":
+            case "strR":
+            case "intR":
+            case "lukR":
+            case "dexR":
+                let sn = name.substring(0,name.length-1)
+                data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[sn+"R"]/100)) * (1+(source[sn+'R'] + val)/100) + source[sn+'D']
+                break
+            case "atR":
+                for (const san of ['str','int','luk','dex']){
+                    data[san] = ((source[san] - source[san+"D"]) / (1+source[san+"R"]/100)) * (1+(source[san+'R'] + val)/100) + source[san+'D']
+                }
+                break
+            default:
+                if (data.hasOwnProperty(name)) data[name] += val
+        }
+        return data
+    }
     calcSourceResult(){
         return computed(()=>{
-            const data = dupeObj(this.data)
-            for (const v of this.data.imdR){
-                data.imdR.push(v)
-            }
             const result = dupeObj(calcStats)
             result.diff = 0
             result.dDamage = 0
@@ -367,42 +405,8 @@ class Stat {
             if (!result.hasOwnProperty(this.calcSource.name) && this.calcSource.name!=='atR'){
                 return result
             }
-            switch (this.calcSource.name) {
-                case "imdR":
-                    data[this.calcSource.name].push(this.calcSource.val)
-                    break
-                case "hp":
-                case "str":
-                case "int":
-                case "luk":
-                case "dex":
-                    data[this.calcSource.name] = ((this.data[this.calcSource.name] - this.data[this.calcSource.name+"D"]) / (1+this.data[this.calcSource.name+"R"]/100) + this.calcSource.val) * (1+this.data[this.calcSource.name+'R']/100) + this.data[this.calcSource.name+'D']
-                    break
-                case "hpD":
-                case "strD":
-                case "intD":
-                case "lukD":
-                case "dexD":
-                    let sdn = this.calcSource.name.substring(0,this.calcSource.name.length-1)
-                    data[sdn] += this.calcSource.val
-                    break
-                case "hpR":
-                case "strR":
-                case "intR":
-                case "lukR":
-                case "dexR":
-                    let sn = this.calcSource.name.substring(0,this.calcSource.name.length-1)
-                    data[sn] = ((this.data[sn] - this.data[sn+"D"]) / (1+this.data[sn+"R"]/100)) * (1+(this.data[sn+'R'] + this.calcSource.val)/100) + this.data[sn+'D']
-                    break
-                case "atR":
-                    for (const san of ['str','int','luk','dex']){
-                        data[san] = ((this.data[san] - this.data[san+"D"]) / (1+this.data[san+"R"]/100)) * (1+(this.data[san+'R'] + this.calcSource.val)/100) + this.data[san+'D']
-                    }
-                    break
-                default:
-                    data[this.calcSource.name] += this.calcSource.val
-            }
 
+            const data = this.addStat(this.data,this.calcSource.name,this.calcSource.val)
             const beforeResult = this.calcNewData(this.data)
             const afterResult = this.calcNewData(data)
 

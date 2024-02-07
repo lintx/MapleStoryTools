@@ -137,6 +137,127 @@ function handleBack() {
   router.push(`/stat-calc`)
 }
 
+const hyperStateLogs = ref(""),calcHyperIng = ref(false)
+function calcHyperState() {
+  calcHyperIng.value = true
+  const needPoints = [0 ,1, 2, 4, 8, 10, 15, 20, 25, 30, 35, 50, 65, 80, 95, 110]
+  hyperStateLogs.value = ""
+  //用於比較的屬性，初始是當前屬性
+  let lastStat = stats.value.addStat(stats.value.data)
+  const initialImdR = lastStat.imdR
+  if (lastStat.level < 140){
+    hyperStateLogs.value += "等級不足140無法計算"
+    calcHyperIng.value = false
+    return
+  }
+  if (!jobs.hasOwnProperty(lastStat.job)){
+    hyperStateLogs.value += "無職業無法計算"
+    calcHyperIng.value = false
+    return
+  }
+  //計算屬性點數
+  let hyperPoint = 0
+  for (let i=140;i<=lastStat.level;i++){
+    hyperPoint += Math.floor(3 + (i-140)/10)
+  }
+  hyperStateLogs.value += `超級屬性點總計${hyperPoint}\n`
+  hyperStateLogs.value +=` \n---提升順序---\n`
+  //升級會帶來打王提升的超級屬性
+  const hyperLevel = {
+    cdR:0,
+    imdR:0,
+    damR:0,
+    bdR:0,
+    pmad:0,
+  }
+  for (const ps of jobs[lastStat.job].ps){
+    if (ps==='hp') hyperLevel['hpR'] = 0
+    else hyperLevel[ps+'D'] = 0
+  }
+  for (const ss of jobs[lastStat.job].ss){
+    hyperLevel[ss+'D'] = 0
+  }
+
+  let lastResult = stats.value.calcData().value
+  let lastImdR = initialImdR
+  for (;;){
+    let bestResult = lastResult
+    let bestCostP = 0
+    let bestName = ""
+    let bestLevel = 0
+    let bestPoint = 0
+    let bestStat = lastStat
+    let bestDiff = 0
+    for (const name of Object.keys(hyperLevel)){
+      let nextLevel = hyperLevel[name]+1
+      if (name==='imdR') nextLevel = 15
+      for (let level=hyperLevel[name]+1;level<=nextLevel;level++){
+        //需要的點數
+        let point = 0
+        //提升的數值
+        let val = 0
+        for (let i=hyperLevel[name]+1;i<=level;i++){
+          point += needPoints[i]
+          switch (name) {
+            case "strD":
+            case "intD":
+            case "lukD":
+            case "dexD":
+              val += 30
+              break
+            case "cdR":
+              val += 1
+              break
+            case "damR":
+            case "pmad":
+              val += 3
+              break
+            case "bdR":
+              val += i <= 5 ? 3 : 4
+              break
+            case "hpR":
+              val += 2
+              break
+          }
+        }
+        if (name==='imdR'){
+          val = level * 3
+        }
+        if (hyperPoint < point) continue
+        lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
+        const newStat = stats.value.addStat(lastStat,name,val)
+        const addResult = stats.value.calcNewData(newStat)
+        const diff = addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage
+        const costP = diff / point
+        console.log('continue',name,level,hyperPoint,point,diff)
+        if (costP > bestCostP){
+          bestCostP = costP
+          bestName = name
+          bestLevel = level
+          bestPoint = point
+          bestStat = newStat
+          bestDiff = diff
+          bestResult = addResult
+        }
+      }
+    }
+    if (bestCostP === 0) break
+    hyperPoint -= bestPoint
+    hyperStateLogs.value += `提升${props[bestName].replace('最終','')}至${bestLevel}等，提升防後b攻${bestDiff}，花費${bestPoint}點，性價比${Math.round(bestCostP)}，剩餘點數${hyperPoint}\n`
+    if (bestName==='imdR') lastImdR = bestStat.imdR
+    lastStat = bestStat
+    lastResult = bestResult
+    hyperLevel[bestName] = bestLevel
+  }
+  hyperStateLogs.value +=` \n---最終結果---\n`
+  Object.keys(hyperLevel).forEach(name=>{
+    hyperStateLogs.value +=`${props[name].replace('最終','')} ${hyperLevel[name]} 等\n`
+  })
+  hyperStateLogs.value +=`剩餘點數 ${hyperPoint} 點\n`
+
+  calcHyperIng.value = false
+}
+
 </script>
 
 <template>
@@ -333,7 +454,7 @@ function handleBack() {
         </n-tab-pane>
         <n-tab-pane name="result" tab="計算結果">
           <n-form>
-            <n-collapse :default-expanded-names="['1','2']">
+            <n-collapse :default-expanded-names="['1','2','3']">
               <n-collapse-item title="素質" name="1">
                 <n-grid item-responsive responsive="screen">
                   <n-gi :span="gis">
@@ -438,6 +559,19 @@ function handleBack() {
                     <n-gi :span="gis">{{props.pmdR}}：{{stats.calcSourceResult().value.pmdR}}%</n-gi>
                     <n-gi :span="gis">{{props.cdR}}：{{stats.calcSourceResult().value.cdR}}%</n-gi>
                   </n-grid>
+                </n-space>
+              </n-collapse-item>
+              <n-collapse-item title="超級屬性" name="3">
+                <n-space vertical>
+                  <n-alert :show-icon="false">
+                    計算超級屬性時建議將超級屬性初始化後更新屬性再計算，否則可能會有偏差。<br>
+                    注意先將暴擊率點到100%。<br>
+                    注意計算結果受“素質”ui中的目標防禦%影響
+                  </n-alert>
+                  <n-button :loading="calcHyperIng" @click="calcHyperState">
+                    點我開始計算
+                  </n-button>
+                  <n-log :log="hyperStateLogs"/>
                 </n-space>
               </n-collapse-item>
             </n-collapse>
