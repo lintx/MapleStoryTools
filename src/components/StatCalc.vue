@@ -660,7 +660,6 @@ function calcHexaState() {
                     注意先將暴擊率點到100%。<br>
                     注意計算結果受“素質”ui中的目標防禦%影響
                   </n-alert>
-                  當前等級（開始計算前將當前等級的素質減掉）
                   <n-button :loading="calcHyperIng" @click="calcHyperState">
                     點我開始計算
                   </n-button>
