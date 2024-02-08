@@ -258,6 +258,98 @@ function calcHyperState() {
   calcHyperIng.value = false
 }
 
+const hexaStateLogs = ref(""),calcHexaIng = ref(false)
+const hexaTypesOption = [
+  {label:props["cdR"],value:"cdR"},
+  {label:props["bdR"],value:"bdR"},
+  {label:props["imdR"],value:"imdR"},
+  {label:props["damR"],value:"damR"},
+  {label:props["pmad"],value:"pmad"},
+  {label:props["hexaStat"],value:"hexaStat"},
+]
+const hexaData = ref({
+  primary:{
+    level:0,
+    name:"",
+    label:"主要屬性",
+  },
+  secondary1:{
+    level:0,
+    name:"",
+    label:"次要屬性1",
+  },
+  secondary2:{
+    level:0,
+    name:"",
+    label:"次要屬性2",
+  },
+})
+function calcHexaState() {
+  calcHexaIng.value = true
+  hexaStateLogs.value = ''
+  if (!jobs.hasOwnProperty(stats.value.data.job)){
+    hexaStateLogs.value += "無職業無法計算"
+    calcHexaIng.value = false
+    return
+  }
+  const allLv = hexaData.value.primary.level + hexaData.value.secondary1.level + hexaData.value.secondary2.level
+  if (allLv < 1){
+    hexaStateLogs.value += "HEXA屬性核心總等級小於1無法計算"
+    calcHexaIng.value = false
+    return
+  }
+  if (allLv < 2){
+    hexaStateLogs.value += "HEXA屬性核心總等級大於20，是否填寫錯誤？"
+    calcHexaIng.value = false
+    return
+  }
+  const sourceStat = stats.value.hexaStat(stats.value.data,hexaData.value,false)
+  const sourceResult = stats.value.calcNewData(sourceStat)
+  hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${sourceResult.defBossCriticalDamage}`
+  hexaStateLogs.value +=` \n---開始計算---\n`
+  const cd = {
+    primary:{
+      level:hexaData.value.primary.level,
+      name:"",
+    },
+    secondary1:{
+      level:hexaData.value.secondary1.level,
+      name:"",
+    },
+    secondary2:{
+      level:hexaData.value.secondary2.level,
+      name:"",
+    },
+  }
+  let bestPn="",bestSn1="",bestSn2="",bestDiff=0,bestBCD=0
+  for (const {value:pn} of hexaTypesOption){
+    for (const {value:sn1} of hexaTypesOption){
+      if (pn===sn1) continue
+      for (const {value:sn2} of hexaTypesOption){
+        if (pn===sn2 || sn1===sn2) continue
+        cd.primary.name = pn
+        cd.secondary1.name = sn1
+        cd.secondary2.name = sn2
+        const ts = stats.value.hexaStat(stats.value.data,cd)
+        const tr = stats.value.calcNewData(ts)
+        const diff = tr.defBossCriticalDamage - sourceResult.defBossCriticalDamage
+        if (diff > bestDiff){
+          bestBCD = tr.defBossCriticalDamage
+          bestDiff = diff
+          bestPn = pn
+          bestSn1 = sn1
+          bestSn2 = sn2
+        }
+        hexaStateLogs.value += `主：${props[pn]}(${cd.primary.level}等)，副1：${props[sn1]}(${cd.secondary1.level}等)，副2：${props[sn2]}(${cd.secondary2.level}等)，防後爆B攻為${tr.defBossCriticalDamage}，提升${diff}\n`
+      }
+    }
+  }
+
+  hexaStateLogs.value +=` \n---最終結果---\n`
+  hexaStateLogs.value += `提升最大的組合為：主：${props[bestPn]}(${cd.primary.level}等)，副1：${props[bestSn1]}(${cd.secondary1.level}等)，副2：${props[bestSn2]}(${cd.secondary2.level}等)，防後爆B攻為${bestBCD}，提升${bestDiff}\n`
+  calcHexaIng.value = false
+}
+
 </script>
 
 <template>
@@ -454,7 +546,7 @@ function calcHyperState() {
         </n-tab-pane>
         <n-tab-pane name="result" tab="計算結果">
           <n-form>
-            <n-collapse :default-expanded-names="['1','2','3']">
+            <n-collapse :default-expanded-names="['1','2']">
               <n-collapse-item title="素質" name="1">
                 <n-grid item-responsive responsive="screen">
                   <n-gi :span="gis">
@@ -568,10 +660,38 @@ function calcHyperState() {
                     注意先將暴擊率點到100%。<br>
                     注意計算結果受“素質”ui中的目標防禦%影響
                   </n-alert>
+                  當前等級（開始計算前將當前等級的素質減掉）
                   <n-button :loading="calcHyperIng" @click="calcHyperState">
                     點我開始計算
                   </n-button>
                   <n-log :log="hyperStateLogs"/>
+                </n-space>
+              </n-collapse-item>
+              <n-collapse-item title="HEXA屬性" name="4">
+                <n-space vertical>
+                  <template v-for="item of hexaData">
+                    <n-form-item label-placement="left" :label="item.label">
+                      <n-input-group>
+                        <n-popover trigger="hover">
+                          <template #trigger>
+                            <n-input-number min="0" max="10" v-model:value="item.level" />
+                          </template>
+                          <span>填入{{item.label}}的等級</span>
+                        </n-popover>
+                        <n-popover trigger="hover">
+                          <template #trigger>
+                            <n-select v-model:value="item.name" :options="hexaTypesOption" />
+                          </template>
+                          <span>選擇{{item.label}}的類別</span>
+                        </n-popover>
+                      </n-input-group>
+                    </n-form-item>
+                  </template>
+
+                  <n-button :loading="calcHexaIng" @click="calcHexaState">
+                    點我開始計算
+                  </n-button>
+                  <n-log :log="hexaStateLogs"/>
                 </n-space>
               </n-collapse-item>
             </n-collapse>

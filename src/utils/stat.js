@@ -79,6 +79,7 @@ const propNames = {
     incint:"吃藥增加int",
     incluk:"吃藥增加luk",
     inchp:"吃藥增加hp",
+    hexaStat:"主屬",
 }
 const data = v1
 
@@ -393,6 +394,43 @@ class Stat {
                 if (data.hasOwnProperty(name)) data[name] += val
         }
         return data
+    }
+    hexaStat(source,config,isAdd=true){
+        const statConfig = {
+            cdR:0.35,
+            bdR:1,
+            imdR:1,
+            damR:0.75,
+            pmad:5,
+        }
+        let result = this.data
+        if (!jobs.hasOwnProperty(this.data.job)){
+            return result
+        }
+        for (const key in config){
+            const item = config[key]
+            let rate = key==="primary" ? item.level + Math.max(item.level-4,0) + Math.max(item.level-7,0) + Math.max(item.level-9,0) : item.level
+            if (!isAdd) rate = -rate
+            if (item.name==="hexaStat"){
+                switch (this.data.job) {
+                    case "3122":
+                        result = this.addStat(result,'hpD',rate * 2100)
+                        break
+                    case "3612":
+                        for (const s of jobs[this.data.job].ps){
+                            result = this.addStat(result,s+'D',rate * 48)
+                        }
+                        break
+                    default:
+                        for (const s of jobs[this.data.job].ps){
+                            result = this.addStat(result,s+'D',rate * 100)
+                        }
+                }
+            }else if (statConfig.hasOwnProperty(item.name)) {
+                result = this.addStat(result,item.name,rate * statConfig[item.name])
+            }
+        }
+        return result
     }
     calcSourceResult(){
         return computed(()=>{
