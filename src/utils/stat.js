@@ -426,6 +426,12 @@ class Stat {
                             result = this.addStat(result,s+'D',rate * 100)
                         }
                 }
+            }else if (item.name==='imdR' && !isAdd){
+                //扣除無視防禦時，應這樣扣除
+                //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
+                let mdr = -rate * statConfig[item.name]
+                mdr = 100-10000/(100-mdr)
+                result = this.addStat(result,item.name,mdr)
             }else if (statConfig.hasOwnProperty(item.name)) {
                 result = this.addStat(result,item.name,rate * statConfig[item.name])
             }
