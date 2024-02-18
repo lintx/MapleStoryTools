@@ -96,7 +96,7 @@ const jobGroups = [
     {name:"雷普族",child:[15212,15512,15112,15412]},
     {name:"阿尼瑪",child:[16412,16212]},
     {name:"曉之陣",child:[4112,4212]},
-    {name:"武神",child:[17512]},
+    {name:"江湖團",child:[17512]},
     {name:"其他",child:[101121,101122,14212]},
 ]
 
@@ -360,7 +360,13 @@ class Stat {
         }
         switch (name) {
             case "imdR":
-                data[name].push(val)
+                if (val < 0){
+                    //扣除無視防禦時，應這樣扣除
+                    //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
+                    data[name].push(100-10000/(100+val))
+                }else {
+                    data[name].push(val)
+                }
                 break
             case "hp":
             case "str":
@@ -426,12 +432,12 @@ class Stat {
                             result = this.addStat(result,s+'D',rate * 100)
                         }
                 }
-            }else if (item.name==='imdR' && !isAdd){
-                //扣除無視防禦時，應這樣扣除
-                //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
-                let mdr = -rate * statConfig[item.name]
-                mdr = 100-10000/(100-mdr)
-                result = this.addStat(result,item.name,mdr)
+            // }else if (item.name==='imdR' && !isAdd){
+            //     //扣除無視防禦時，應這樣扣除
+            //     //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
+            //     let mdr = -rate * statConfig[item.name]
+            //     mdr = 100-10000/(100-mdr)
+            //     result = this.addStat(result,item.name,mdr)
             }else if (statConfig.hasOwnProperty(item.name)) {
                 result = this.addStat(result,item.name,rate * statConfig[item.name])
             }
