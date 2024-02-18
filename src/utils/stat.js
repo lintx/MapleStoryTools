@@ -105,9 +105,9 @@ export function getJobGroups(){
 }
 
 const jobs = {
-    1121:{name:"英雄(單手武器)",wm:1.3,ps:["str"],ss:["dex"]},
+    1121:{name:"英雄(單手武器)",wm:1.34,ps:["str"],ss:["dex"]},
     1122:{name:"英雄(雙手武器)",wm:1.44,ps:["str"],ss:["dex"]},
-    1221:{name:"聖騎士(單手武器)",wm:1.2,ps:["str"],ss:["dex"]},
+    1221:{name:"聖騎士(單手武器)",wm:1.24,ps:["str"],ss:["dex"]},
     1222:{name:"聖騎士(雙手武器)",wm:1.34,ps:["str"],ss:["dex"]},
     132:{name:"黑騎士",wm:1.49,ps:["str"],ss:["dex"]},
     212:{name:"大魔導士(火、毒)",wm:1.2,ps:["int"],ss:["luk"]},
@@ -122,13 +122,13 @@ const jobs = {
     512:{name:"拳霸",wm:1.7,ps:["str"],ss:["dex"]},
     522:{name:"槍神",wm:1.5,ps:["dex"],ss:["str"]},
     532:{name:"重砲指揮官",wm:1.5,ps:["str"],ss:["dex"]},
-    11121:{name:"聖魂劍士(單手武器)",wm:1.2,ps:["str"],ss:["dex"]},
+    11121:{name:"聖魂劍士(單手武器)",wm:1.24,ps:["str"],ss:["dex"]},
     11122:{name:"聖魂劍士(雙手武器)",wm:1.34,ps:["str"],ss:["dex"]},
     1212:{name:"烈焰巫師",wm:1.2,ps:["int"],ss:["luk"]},
     1312:{name:"破風使者",wm:1.3,ps:["dex"],ss:["str"]},
     1412:{name:"暗夜行者",wm:1.75,ps:["luk"],ss:["dex"]},
     1512:{name:"閃雷悍將",wm:1.7,ps:["str"],ss:["dex"]},
-    5112:{name:"米哈逸",wm:1.2,ps:["str"],ss:["dex"]},
+    5112:{name:"米哈逸",wm:1.24,ps:["str"],ss:["dex"]},
     3312:{name:"狂豹獵人",wm:1.35,ps:["dex"],ss:["str"]},
     3512:{name:"機甲戰神",wm:1.5,ps:["dex"],ss:["str"]},
     3212:{name:"煉獄巫師",wm:1.2,ps:["int"],ss:["luk"]},
