@@ -96,7 +96,7 @@ const jobGroups = [
     {name:"雷普族",child:[15212,15512,15112,15412]},
     {name:"阿尼瑪",child:[16412,16212]},
     {name:"曉之陣",child:[4112,4212]},
-    {name:"江湖團",child:[17512]},
+    {name:"江湖團",child:[17512,17212]},
     {name:"其他",child:[101121,101122,14212]},
 ]
 
@@ -158,6 +158,7 @@ const jobs = {
     4112:{name:"劍豪",wm:1.25,ps:["str"],ss:["dex"]},
     4212:{name:"陰陽師",wm:1.35,ps:["int"],ss:["luk"]},
     17512:{name:"墨玄",wm:1.75,ps:["dex"],ss:["str"]},
+    17212:{name:"琳恩",wm:1.34,ps:["int"],ss:["luk"]},
 }
 const calcStats = {
     damR:0,//傷害
