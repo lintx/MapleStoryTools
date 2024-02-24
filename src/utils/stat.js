@@ -205,7 +205,7 @@ function dupeObj(obj) {
 
 export function importData(str){
     let arr = str.split(",")
-    let v = parseInt(arr.shift())
+    let v = Number(arr.shift())
     if (!(v in verMap)){
         return null
     }
@@ -222,12 +222,13 @@ export function importData(str){
             const _arr = arr[i].split("-")
             const r = []
             for (const v of _arr){
-                const val = parseInt(v)
+                const val = Number(v)
                 if (!isNaN(val)) r.push(val)
             }
             rd[k] = r
         }else if (typeof vd[k] === "number"){
-            rd[k]=parseInt(arr[i])
+            rd[k]=Number(arr[i])
+            if (isNaN(rd[k])) rd[k] = 0
         }else {
             return null
         }
