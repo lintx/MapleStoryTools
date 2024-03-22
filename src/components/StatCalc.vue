@@ -12,6 +12,7 @@ const calcStats = stat.getCalcStats()
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog();
 
 let stopSw = null
 let index = ref(null),stats = ref(null),showName = ref(null),calcSource = ref(null)
@@ -75,23 +76,9 @@ for (const item of jobGroups){
 }
 
 function calcSP(t) {
-  if (stats.value.data["inc"+t]===0) {
-    message.error("吃藥增加的屬性為0，無法計算%數");
-    return
-  }
-  const add = stats.value.data[t+"A"] - stats.value.data[t]
-  switch (t) {
-    case "str":
-    case "int":
-    case "luk":
-    case "dex":
-      stats.value.data[t+"R"] = Math.ceil((add / stats.value.data["inc"+t] - 1) * 100)
-      break
-    case "hp":
-      const chp = add / stats.value.data["inc"+t] * 100
-      stats.value.data[t+"R"] = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
-      break
-  }
+  calcStatType.value = t
+  currentStep.value = 1
+  showCalcStatModal.value = true
 }
 
 function statIsShow(s) {
@@ -350,6 +337,42 @@ function calcHexaState() {
   calcHexaIng.value = false
 }
 
+const showCalcStatModal = ref(false)
+const calcStatType = ref("str")
+const currentStep = ref(1);
+function onCalcStatPositiveClick() {
+  const t = calcStatType.value
+  if (stats.value.data["inc"+t]===0) {
+    dialog.error({
+      title: "出錯了",
+      content: "吃藥增加的屬性為0，無法計算%數",
+      positiveText: "好"
+    });
+    return
+  }
+  const add = stats.value.data[t+"A"] - stats.value.data[t]
+  if (add===0) {
+    dialog.error({
+      title: "出錯了",
+      content: "吃藥前後屬性相同，無法計算%數",
+      positiveText: "好"
+    });
+    return
+  }
+  showCalcStatModal.value = false
+  switch (t) {
+    case "str":
+    case "int":
+    case "luk":
+    case "dex":
+      stats.value.data[t+"R"] = Math.ceil((add / stats.value.data["inc"+t] - 1) * 100)
+      break
+    case "hp":
+      const chp = add / stats.value.data["inc"+t] * 100
+      stats.value.data[t+"R"] = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
+      break
+  }
+}
 </script>
 
 <template>
@@ -478,34 +501,17 @@ function calcHexaState() {
               <n-collapse-item title="主副屬" name="4">
                 <n-space vertical>
                   <n-alert :show-icon="false">
-                    屬性填寫方法：先填寫當前屬性、最終屬性（ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性），然後通過吃藥等手段提升屬性（推薦拍賣拉最上級祝福秘藥、傳說中的祝福秘藥等全屬性增加固定數值的秘藥），並在吃藥增加屬性中填寫增加的屬性，和吃藥後屬性，之後點按右側的“重算%”按鈕即可。如果不嫌麻煩也可以自己手動計算屬性%，此時可不填吃藥增加的屬性、吃藥後的屬性，但是依然要填寫未吃藥時的屬性和最終屬性<br>
-                    對於惡復，應在正確填寫其他屬性後，使用三轉技能“急速療癒”或五轉技能“聖火”以增加hp%，並在吃藥增加的屬性中填寫對應的%數（25%或40%），填寫增加後的hp總量，然後點擊重算即可。
+                    每種屬性欄，左側填入ui上現在顯示的屬性右側填入ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性相加的結果（惡復不加極限屬性）
                   </n-alert>
                   <n-grid item-responsive responsive="screen">
                     <template v-for="s in statNames">
-                      <n-form-item-gi :label="statLabel(s)" span="24" v-if="statIsShow(s)">
+                      <n-form-item-gi :label="statLabel(s)" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
                         <n-input-group>
                           <n-popover trigger="hover">
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s]" />
                             </template>
-                            <span>填入吃藥前ui上顯示的{{props[s]}}</span>
-                          </n-popover>
-                          <n-popover trigger="hover">
-                            <template #trigger>
-                              <n-input-number v-model:value="stats.data['inc'+s]">
-                                <template v-if="s==='hp'" #suffix>
-                                  %
-                                </template>
-                              </n-input-number>
-                            </template>
-                            <span>填入吃藥增加的{{props[s]}}量(惡復填入增加%)</span>
-                          </n-popover>
-                          <n-popover trigger="hover">
-                            <template #trigger>
-                              <n-input-number v-model:value="stats.data[s+'A']" />
-                            </template>
-                            <span>填入吃藥後ui上顯示的{{props[s]}}</span>
+                            <span>填入ui上顯示的{{props[s]}}</span>
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
@@ -513,6 +519,10 @@ function calcHexaState() {
                             </template>
                             <span>填入不受%加成的{{props[s]}}，<br>來源有ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性等<br>（惡復極限屬性受%加成）</span>
                           </n-popover>
+                        </n-input-group>
+                      </n-form-item-gi>
+                      <n-form-item-gi span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
+                        <n-input-group>
                           <n-popover trigger="hover">
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
@@ -523,18 +533,9 @@ function calcHexaState() {
                             </template>
                             <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
                           </n-popover>
-                          <n-popover trigger="hover">
-                            <template #trigger>
-                              <n-button @click="calcSP(s)">
-                                重算%
-                              </n-button>
-                            </template>
-                            <span>
-                              根據前面數據及公式推算{{props[s]}}%，公式：<br>
-                              四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
-                              hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
-                            </span>
-                          </n-popover>
+                          <n-button @click="calcSP(s)">
+                            重算%
+                          </n-button>
                         </n-input-group>
                       </n-form-item-gi>
                     </template>
@@ -704,6 +705,129 @@ function calcHexaState() {
 <!--      </n-space>-->
 <!--    </template>-->
   </n-page-header>
+  <n-modal
+      v-model:show="showCalcStatModal"
+      :mask-closable="false"
+  >
+    <n-card
+        :bordered="false"
+        size="huge"
+        role="dialog"
+        aria-modal="true"
+        style="width: 100%; max-width: calc(100vw - 32px);"
+    >
+      <n-form>
+        <n-space vertical>
+          <n-steps size="small" :current="currentStep">
+            <n-step title="填寫屬性" />
+            <n-step title="吃藥" />
+            <n-step title="填寫屬性" />
+          </n-steps>
+          <n-space vertical v-show="currentStep===1">
+            <n-alert :show-icon="false">
+              填寫現在的ui上顯示的總{{props[calcStatType]}}
+            </n-alert>
+            <n-input-number v-model:value="stats.data[calcStatType]" />
+          </n-space>
+          <n-space vertical v-show="currentStep===2">
+            <n-alert :show-icon="false">
+              請在遊戲內吃藥（推薦拍賣拉最上級祝福秘藥、傳說中的祝福秘藥等全屬性增加固定數值的秘藥）或穿/脫塔戒，並填寫增加的原始屬性值（e.g:脫下塔戒，則填寫“-4”），惡復使用三轉技能“急速療癒”或五轉技能“聖火”，填寫數值一般為25%或40%
+            </n-alert>
+            <n-input-number v-model:value="stats.data['inc'+calcStatType]">
+              <template v-if="calcStatType==='hp'" #suffix>
+                %
+              </template>
+            </n-input-number>
+          </n-space>
+          <n-space vertical v-show="currentStep===3">
+            <n-alert :show-icon="false">
+              填寫現在的ui上顯示的總{{props[calcStatType]}}
+            </n-alert>
+            <n-input-number v-model:value="stats.data[calcStatType+'A']" />
+          </n-space>
+          <n-space vertical v-if="currentStep===0">
+            <n-form-item-gi label="1">
+            </n-form-item-gi>
+            <n-grid item-responsive responsive="screen">
+              <template v-for="s in statNames">
+                <n-form-item-gi span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
+                  <n-input-group>
+
+
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        <n-input-number v-model:value="stats.data['inc'+s]">
+                          <template v-if="s==='hp'" #suffix>
+                            %
+                          </template>
+                        </n-input-number>
+                      </template>
+                      <span>填入吃藥增加的{{props[s]}}量(惡復填入增加%)</span>
+                    </n-popover>
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        <n-input-number v-model:value="stats.data[s+'A']" />
+                      </template>
+                      <span>填入吃藥後ui上顯示的{{props[s]}}</span>
+                    </n-popover>
+
+
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
+                          <template #suffix>
+                            %
+                          </template>
+                        </n-input-number>
+                      </template>
+                      <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
+                    </n-popover>
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        <n-button @click="calcSP(s)">
+                          重算%
+                        </n-button>
+                      </template>
+                      <span>
+                                根據前面數據及公式推算{{props[s]}}%，公式：<br>
+                                四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
+                                hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
+                              </span>
+                    </n-popover>
+                  </n-input-group>
+                </n-form-item-gi>
+              </template>
+            </n-grid>
+          </n-space>
+        </n-space>
+      </n-form>
+      <template #footer>
+        <n-space justify="center">
+          <n-button @click="showCalcStatModal = false">
+            取消
+          </n-button>
+          <n-button @click="()=>{if(currentStep > 1) currentStep -= 1}" v-show="currentStep > 1">
+            上一步
+          </n-button>
+          <n-button @click="()=>{if(currentStep < 3) currentStep += 1}" v-show="currentStep < 3">
+            下一步
+          </n-button>
+          <n-popover trigger="hover" v-show="currentStep === 3">
+            <template #trigger>
+              <n-button @click="onCalcStatPositiveClick">
+                重算%
+              </n-button>
+            </template>
+            <span>
+              根據前面數據及公式推算{{props[calcStatType]}}%，公式：<br>
+              四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
+              hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
+            </span>
+          </n-popover>
+        </n-space>
+      </template>
+    </n-card>
+  </n-modal>
 </template>
 
 <style scoped>
