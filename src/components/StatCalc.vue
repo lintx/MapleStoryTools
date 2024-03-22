@@ -1,7 +1,7 @@
 <script setup>
 import * as stat from "@/utils/stat.js";
 import {useRoute, useRouter} from "vue-router";
-import {useMessage} from "naive-ui";
+import {useDialog, useMessage} from "naive-ui";
 import {Delete} from "@vicons/carbon";
 
 const store = stat.getStore()
@@ -14,6 +14,7 @@ const router = useRouter()
 const message = useMessage()
 const dialog = useDialog();
 
+const buffs = ref(stat.getBuffs())
 let stopSw = null
 let index = ref(null),stats = ref(null),showName = ref(null),calcSource = ref(null)
 function parseIndex(){
@@ -340,39 +341,45 @@ function calcHexaState() {
 const showCalcStatModal = ref(false)
 const calcStatType = ref("str")
 const currentStep = ref(1);
-function onCalcStatPositiveClick() {
+const calcStatResult = computed(()=>{
   const t = calcStatType.value
   if (stats.value.data["inc"+t]===0) {
-    dialog.error({
-      title: "出錯了",
-      content: "吃藥增加的屬性為0，無法計算%數",
-      positiveText: "好"
-    });
-    return
+    return {value:0, text: "吃藥增加的屬性為0，無法計算%數"}
   }
   const add = stats.value.data[t+"A"] - stats.value.data[t]
   if (add===0) {
-    dialog.error({
-      title: "出錯了",
-      content: "吃藥前後屬性相同，無法計算%數",
-      positiveText: "好"
-    });
-    return
+    return {value:0, text: "吃藥前後屬性相同，無法計算%數"}
   }
-  showCalcStatModal.value = false
+  // showCalcStatModal.value = false
+  let value = 0,text = ""
   switch (t) {
     case "str":
     case "int":
     case "luk":
     case "dex":
-      stats.value.data[t+"R"] = Math.ceil((add / stats.value.data["inc"+t] - 1) * 100)
+      value = Math.ceil((add / stats.value.data["inc"+t] - 1) * 100)
+      //四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%
+      text = `${props[t]}%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%=(((${stats.value.data[t+"A"]} - ${stats.value.data[t]}) ÷ ${stats.value.data["inc"+t]} - 1) ÷ 100)%=${value}%`
       break
     case "hp":
       const chp = add / stats.value.data["inc"+t] * 100
-      stats.value.data[t+"R"] = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
+      value = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
+      //hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
+      text = `${props[t]}%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%(((${stats.value.data[t]} - ${stats.value.data[t+"D"]}) ÷ ((${stats.value.data[t+"A"]} - ${stats.value.data[t]}) ÷ ${stats.value.data["inc"+t]}% × 100) - 1) × 100)%=${value}%`
       break
   }
-}
+  return {value, text}
+})
+
+const addBuff = ref({
+  key:"pmad",
+  val:1,
+  name:"",
+})
+
+const inputPanelCollapseExpanded = ref(['1', '2', '3', '4'])
+const buffsPanelCollapseExpanded = ref(['1', '2'])
+const resultPanelCollapseExpanded = ref(['1', '2'])
 </script>
 
 <template>
@@ -381,7 +388,7 @@ function onCalcStatPositiveClick() {
       <n-tabs default-value="input" size="large" justify-content="space-evenly">
         <n-tab-pane name="input" tab="屬性設定">
           <n-form>
-            <n-collapse :default-expanded-names="['1', '2', '3', '4']">
+            <n-collapse v-model:expanded-names="inputPanelCollapseExpanded">
               <n-collapse-item title="等級、職業" name="1">
                 <n-grid item-responsive responsive="screen">
                   <n-form-item-gi :label="props.level" :span="gis">
@@ -545,9 +552,62 @@ function onCalcStatPositiveClick() {
             </n-collapse>
           </n-form>
         </n-tab-pane>
+        <n-tab-pane name="buffs" tab="BUFF">
+          <n-space vertical>
+            <n-alert :show-icon="false">
+              BUFF板塊內容作用及使用方法：<br>
+              有很多人希望可以分別計算不吃BUFF和吃BUFF時的素質，由於直接在屬性設定板塊中填寫吃BUFF後的素質較為繁瑣，且更新素質較為麻煩，所以製作BUFF板塊。<br>
+              有了獨立的BUFF板塊後，在屬性設定板塊板塊中只需要填寫乾淨素質，在BUFF板塊勾選需要應用的BUFF，在計算結果板塊中查看的即是應用完BUFF之後的素質。<br>
+              如果常用BUFF列表無法滿足，還可以自定BUFF。<br>
+              註：楓祝增加的是按手動增加到屬性值上的屬性點（ui中屬性括號內、加號左側數值減去初始值4，e.g:1000(900+100)，則手動增加的屬性值為900-4=896）增加屬性，一般職業4轉後計算公式可以視為(14+5×等級)*15%/16%捨去小數（你的楓祝加成或許是{{Math.floor((14+5*stats.data.level)*0.15)}}/{{Math.floor((14+5*stats.data.level)*0.16)}}）
+            </n-alert>
+            <n-collapse v-model:expanded-names="buffsPanelCollapseExpanded">
+              <n-collapse-item title="常用BUFF" name="1">
+                <n-space vertical>
+                  <template v-for="buff in buffs.default">
+                    <n-checkbox
+                        v-model:checked="buff.check"
+                        :label="buff.desc"
+                    />
+                  </template>
+                </n-space>
+              </n-collapse-item>
+              <n-collapse-item title="自定BUFF" name="2">
+                <n-space vertical>
+                  <n-input-group>
+                    <n-input-number v-model:value="addBuff.val">
+                      <template v-if="addBuff.key.charAt(addBuff.key.length-1)==='R'" #suffix>
+                        %
+                      </template>
+                    </n-input-number>
+                    <n-select
+                        v-model:value="addBuff.key"
+                        placeholder="請選擇BUFF能力"s
+                        :options="calcStatsOptions"
+                    />
+                  </n-input-group>
+                  <n-input-group>
+                    <n-input v-model:value="addBuff.name" placeholder="請輸入BUFF名稱">
+                    </n-input>
+                    <n-button @click="buffs.add(addBuff.name,addBuff.key,addBuff.val)">添加</n-button>
+                  </n-input-group>
+                  <template v-for="(buff,index) in buffs.custom">
+                    <n-space item-style="display: flex;" align="center">
+                      <n-checkbox
+                          v-model:checked="buff.check"
+                          :label="buff.desc"
+                      />
+                      <n-button size="small" @click="buffs.del(index)">刪除</n-button>
+                    </n-space>
+                  </template>
+                </n-space>
+              </n-collapse-item>
+            </n-collapse>
+          </n-space>
+        </n-tab-pane>
         <n-tab-pane name="result" tab="計算結果">
           <n-form>
-            <n-collapse :default-expanded-names="['1','2']">
+            <n-collapse v-model:expanded-names="resultPanelCollapseExpanded">
               <n-collapse-item title="素質" name="1">
                 <n-grid item-responsive responsive="screen">
                   <n-gi :span="gis">
@@ -722,6 +782,7 @@ function onCalcStatPositiveClick() {
             <n-step title="填寫屬性" />
             <n-step title="吃藥" />
             <n-step title="填寫屬性" />
+            <n-step title="計算結果" />
           </n-steps>
           <n-space vertical v-show="currentStep===1">
             <n-alert :show-icon="false">
@@ -745,85 +806,30 @@ function onCalcStatPositiveClick() {
             </n-alert>
             <n-input-number v-model:value="stats.data[calcStatType+'A']" />
           </n-space>
-          <n-space vertical v-if="currentStep===0">
-            <n-form-item-gi label="1">
-            </n-form-item-gi>
-            <n-grid item-responsive responsive="screen">
-              <template v-for="s in statNames">
-                <n-form-item-gi span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
-                  <n-input-group>
-
-
-                    <n-popover trigger="hover">
-                      <template #trigger>
-                        <n-input-number v-model:value="stats.data['inc'+s]">
-                          <template v-if="s==='hp'" #suffix>
-                            %
-                          </template>
-                        </n-input-number>
-                      </template>
-                      <span>填入吃藥增加的{{props[s]}}量(惡復填入增加%)</span>
-                    </n-popover>
-                    <n-popover trigger="hover">
-                      <template #trigger>
-                        <n-input-number v-model:value="stats.data[s+'A']" />
-                      </template>
-                      <span>填入吃藥後ui上顯示的{{props[s]}}</span>
-                    </n-popover>
-
-
-                    <n-popover trigger="hover">
-                      <template #trigger>
-                        <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
-                          <template #suffix>
-                            %
-                          </template>
-                        </n-input-number>
-                      </template>
-                      <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
-                    </n-popover>
-                    <n-popover trigger="hover">
-                      <template #trigger>
-                        <n-button @click="calcSP(s)">
-                          重算%
-                        </n-button>
-                      </template>
-                      <span>
-                                根據前面數據及公式推算{{props[s]}}%，公式：<br>
-                                四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
-                                hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
-                              </span>
-                    </n-popover>
-                  </n-input-group>
-                </n-form-item-gi>
-              </template>
-            </n-grid>
+          <n-space vertical v-show="currentStep===4">
+            <n-alert :show-icon="false">
+              {{calcStatResult.text}}<br>
+              點更新按鈕將{{props[calcStatType]}}更新為{{calcStatResult.value}}%
+            </n-alert>
+            <n-space justify="center">
+              <n-button @click="stats.data[calcStatType+'R']=calcStatResult.value;showCalcStatModal=false" type="success">
+                更新
+              </n-button>
+            </n-space>
           </n-space>
         </n-space>
       </n-form>
       <template #footer>
-        <n-space justify="center">
+        <n-space justify="end">
+          <n-button @click="()=>{if(currentStep > 1) currentStep -= 1}" :disabled="currentStep <= 1" round>
+            上一步
+          </n-button>
+          <n-button @click="()=>{if(currentStep < 4) currentStep += 1}" :disabled="currentStep >= 4" round>
+            下一步
+          </n-button>
           <n-button @click="showCalcStatModal = false">
             取消
           </n-button>
-          <n-button @click="()=>{if(currentStep > 1) currentStep -= 1}" v-show="currentStep > 1">
-            上一步
-          </n-button>
-          <n-button @click="()=>{if(currentStep < 3) currentStep += 1}" v-show="currentStep < 3">
-            下一步
-          </n-button>
-          <n-popover trigger="hover" v-show="currentStep === 3">
-            <template #trigger>
-              <n-button @click="onCalcStatPositiveClick">
-                重算%
-              </n-button>
-            </template>
-            <span>
-              根據前面數據及公式推算{{props[calcStatType]}}%，公式：<br>
-              四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%<br>
-              hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
-            </span>
-          </n-popover>
         </n-space>
       </template>
     </n-card>

@@ -104,6 +104,103 @@ export function getJobGroups(){
     return jobGroups
 }
 
+class BuffStat{
+    constructor(key,value){
+        this.key = key
+        this.value = value
+    }
+}
+
+class Buff{
+    constructor(name,...stats) {
+        this.name = name
+        this.stats = stats
+        this.check = false
+    }
+    get desc(){
+        return `${this.name}：${this.stats.map(s=>`${propNames[s.key]}+${s.value}${s.key.charAt(s.key.length-1)==='R'?'%':''}`).join('，')}`
+    }
+}
+
+const localBuffKey = `stat_buff_data`
+class Buffs{
+    load(){
+        const local = localStorage.getItem(localBuffKey)
+        try {
+            const j = JSON.parse(local)
+            if (Array.isArray(j)){
+                for (const i of j){
+                    if (Array.isArray(i) && i.length===3){
+                        this.custom.push(new Buff(i[0],new BuffStat(i[1],i[2])))
+                    }
+                }
+            }
+        }catch (e) {
+
+        }
+    }
+    constructor() {
+        this.save_func = debounce(()=>{
+            const arr = []
+            for (const s of this.custom){
+                arr.push([s.name,s.stats[0].key,s.stats[0].value])
+            }
+            localStorage.setItem(localBuffKey,JSON.stringify(arr))
+        })
+        this.default = [
+            new Buff(`工會BOSS`,new BuffStat("bdR",30)),
+            new Buff(`工會無視`,new BuffStat("imdR",30)),
+            new Buff(`工會總傷`,new BuffStat("damR",30)),
+            new Buff(`工會爆傷`,new BuffStat("cdR",30)),
+            new Buff(`工會祝福`,new BuffStat("pmad",20)),
+            new Buff(`工會大祝福`,new BuffStat("pmad",30)),
+            new Buff(`MVP`,new BuffStat("pmad",30)),
+            new Buff(`破王天氣`,new BuffStat("pmad",30)),
+            new Buff(`聯盟之力`,new BuffStat("pmad",30)),
+            new Buff(`怪公藥水`,new BuffStat("pmad",30)),
+            new Buff(`紅色星星`,new BuffStat("bdR",20)),
+            new Buff(`藍色星星`,new BuffStat("imdR",20)),
+            new Buff(`力量藥水`,new BuffStat("str",30)),
+            new Buff(`智力藥水`,new BuffStat("int",30)),
+            new Buff(`運氣藥水`,new BuffStat("luk",30)),
+            new Buff(`敏捷藥水`,new BuffStat("dex",30)),
+            new Buff(`大英雄`,new BuffStat("damR",10)),
+            new Buff(`章魚燒炒麵`,new BuffStat("pmad",20)),
+            new Buff(`戰鬥機`,new BuffStat("pmad",30)),
+            new Buff(`裝備名匠`,new BuffStat("cdR",5)),
+            new Buff(`275椅子`,new BuffStat("pmad",50)),
+            new Buff(`五轉眼`,new BuffStat("cdR",8)),
+            new Buff(`30等弓手眼`,new BuffStat("cdR",15)),
+            new Buff(`31等弓手眼`,new BuffStat("cdR",16)),
+            new Buff(`主教祝福`,new BuffStat("pmad",50),new BuffStat("bdR",10)),
+            new Buff(`五轉祝福`,new BuffStat("pmad",20)),
+            new Buff(`小屋BOSS`,new BuffStat("bdR",15)),
+            new Buff(`回聲`,new BuffStat("pmadR",4)),
+            new Buff(`狂豹咆哮`,new BuffStat("pmadR",10)),
+            new Buff(`晚上的氣息`,new BuffStat("hp",1000)),
+            new Buff(`武公`,new BuffStat("pmadR",100)),
+        ]
+        this.custom = []
+        this.load()
+    }
+    save(){
+        this.save_func()
+    }
+    add(name,key,val){
+        this.custom.push(new Buff(name,new BuffStat(key,val)))
+        this.save()
+    }
+    del(i){
+        this.custom.splice(i,1)
+        this.save()
+    }
+}
+
+const buffs = new Buffs()
+export function getBuffs(){
+    return buffs
+}
+
 const jobs = {
     1121:{name:"英雄(單手武器)",wm:1.34,ps:["str"],ss:["dex"]},
     1122:{name:"英雄(雙手武器)",wm:1.44,ps:["str"],ss:["dex"]},
@@ -308,6 +405,22 @@ class Stat {
         if (!jobs.hasOwnProperty(this.data.job)){
             return result
         }
+        if (data===this.data) data = this.addStat(this.data,"",0)
+        //計算buff
+        for (const buff of buffs.default){
+            if (buff.check){
+                for (const ss of buff.stats){
+                    this.addStat(data,ss.key,ss.value,false)
+                }
+            }
+        }
+        for (const buff of buffs.custom){
+            if (buff.check){
+                for (const ss of buff.stats){
+                    this.addStat(data,ss.key,ss.value,false)
+                }
+            }
+        }
 
         //計算無視
         let mdr = 100
@@ -355,17 +468,30 @@ class Stat {
 
         return result
     }
-    addStat(source,name,val){
-        const data = dupeObj(source)
-        for (const v of source.imdR){
-            data.imdR.push(v)
+    addStat(source,name,val,dupe=true){
+        const data = dupe ? dupeObj(source) : source
+        if (dupe){
+            for (const v of source.imdR){
+                data.imdR.push(v)
+            }
         }
+        if (name==="") return data
         switch (name) {
             case "imdR":
                 if (val < 0){
                     //扣除無視防禦時，應這樣扣除
                     //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
-                    data[name].push(100-10000/(100+val))
+                    let sub = false
+                    for (let i=0;i<data.imdR.length;i++){
+                        if (data.imdR[i]===-val){
+                            data.imdR.splice(i,1)
+                            sub = true
+                            break
+                        }
+                    }
+                    if (!sub){
+                        data[name].push(100-10000/(100+val))
+                    }
                 }else {
                     data[name].push(val)
                 }
@@ -375,7 +501,8 @@ class Stat {
             case "int":
             case "luk":
             case "dex":
-                data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
+                // data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
+                data[name] += val * (1+source[name+'R']/100)
                 break
             case "hpD":
             case "strD":
@@ -384,6 +511,7 @@ class Stat {
             case "dexD":
                 let sdn = name.substring(0,name.length-1)
                 data[sdn] += val
+                data[name] += val
                 break
             case "hpR":
             case "strR":
@@ -391,11 +519,13 @@ class Stat {
             case "lukR":
             case "dexR":
                 let sn = name.substring(0,name.length-1)
-                data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[sn+"R"]/100)) * (1+(source[sn+'R'] + val)/100) + source[sn+'D']
+                data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[name]/100)) * (1+(source[name] + val)/100) + source[sn+'D']
+                data[name] += val
                 break
             case "atR":
                 for (const san of ['str','int','luk','dex']){
                     data[san] = ((source[san] - source[san+"D"]) / (1+source[san+"R"]/100)) * (1+(source[san+'R'] + val)/100) + source[san+'D']
+                    data[san+'R'] += val
                 }
                 break
             default:
@@ -551,7 +681,6 @@ class Store{
     })
     constructor() {
         this.load()
-
     }
     load(){
         const local = localStorage.getItem(localKey)
