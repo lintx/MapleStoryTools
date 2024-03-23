@@ -125,13 +125,79 @@ function handleBack() {
 }
 
 const hyperStateLogs = ref(""),calcHyperIng = ref(false)
+const hyperPlans = [
+  {
+    label:"打王",
+    value:0,
+  },
+  {
+    label:"練功",
+    value:1,
+  },
+]
+const hyperPlan = ref(0)
+const currentHyperLevel = ref({
+  strD:0,
+  dexD:0,
+  intD:0,
+  lukD:0,
+  hpR:0,
+  cdR:0,
+  imdR:0,
+  damR:0,
+  bdR:0,
+  pmad:0,
+  ndR:0,
+})
+const currentHyperPoint = ref(0)
+const calcHyperLevel = ref({})
+for (const name of Object.keys(currentHyperLevel.value)){
+  calcHyperLevel.value[name] = 0
+}
 function calcHyperState() {
-  calcHyperIng.value = true
   const needPoints = [0 ,1, 2, 4, 8, 10, 15, 20, 25, 30, 35, 50, 65, 80, 95, 110]
+  function pointAndVal(name,startLevel,currentLevel){
+    //需要的點數
+    let point = 0
+    //提升的數值
+    let val = 0
+    for (let i=startLevel+1;i<=currentLevel;i++){
+      point += needPoints[i]
+      switch (name) {
+        case "strD":
+        case "intD":
+        case "lukD":
+        case "dexD":
+          val += 30
+          break
+        case "cdR":
+          val += 1
+          break
+        case "damR":
+        case "pmad":
+          val += 3
+          break
+        case "bdR":
+        case "ndR":
+          val += i <= 5 ? 3 : 4
+          break
+        case "hpR":
+          val += 2
+          break
+      }
+    }
+    if (name==='imdR'){
+      val = currentLevel * 3
+    }
+    return {
+      point,
+      val
+    }
+  }
+  calcHyperIng.value = true
   hyperStateLogs.value = ""
   //用於比較的屬性，初始是當前屬性
-  let lastStat = stats.value.addStat(stats.value.data)
-  const initialImdR = lastStat.imdR
+  let lastStat = stats.value.addStat(stats.value.data,"")
   if (lastStat.level < 140){
     hyperStateLogs.value += "等級不足140無法計算"
     calcHyperIng.value = false
@@ -142,30 +208,33 @@ function calcHyperState() {
     calcHyperIng.value = false
     return
   }
-  //計算屬性點數
-  let hyperPoint = 0
-  for (let i=140;i<=lastStat.level;i++){
-    hyperPoint += Math.floor(3 + (i-140)/10)
+  //屬性點數
+  let hyperPoint = currentHyperPoint.value
+  //扣除舊屬性，返還SP
+  for (const name of Object.keys(currentHyperLevel.value)){
+    const {point,val} = pointAndVal(name,0,currentHyperLevel.value[name])
+    hyperPoint += point
+    stats.value.addStat(lastStat,name,-val,false)
+    calcHyperLevel.value[name] = 0
   }
+  // console.log(lastStat)
+
+  const initialImdR = lastStat.imdR
+  // for (let i=140;i<=lastStat.level;i++){
+  //   hyperPoint += Math.floor(3 + (i-140)/10)
+  // }
   hyperStateLogs.value += `超級屬性點總計${hyperPoint}\n`
   hyperStateLogs.value +=` \n---提升順序---\n`
   //升級會帶來打王提升的超級屬性
-  const hyperLevel = {
-    cdR:0,
-    imdR:0,
-    damR:0,
-    bdR:0,
-    pmad:0,
-  }
-  for (const ps of jobs[lastStat.job].ps){
-    if (ps==='hp') hyperLevel['hpR'] = 0
-    else hyperLevel[ps+'D'] = 0
-  }
-  for (const ss of jobs[lastStat.job].ss){
-    hyperLevel[ss+'D'] = 0
-  }
+  // const pss = []
+  // for (const ps of jobs[lastStat.job].ps){
+  //   pss.push(ps)
+  // }
+  // for (const ss of jobs[lastStat.job].ss){
+  //   pss.push(ss)
+  // }
 
-  let lastResult = stats.value.calcData().value
+  let lastResult = stats.value.calcNewData(lastStat,hyperPlan.value===0)
   let lastImdR = initialImdR
   for (;;){
     let bestResult = lastResult
@@ -175,48 +244,27 @@ function calcHyperState() {
     let bestPoint = 0
     let bestStat = lastStat
     let bestDiff = 0
-    for (const name of Object.keys(hyperLevel)){
-      let nextLevel = hyperLevel[name]+1
+    for (const name of Object.keys(calcHyperLevel.value)){
+      if (hyperPlan.value===0 ){
+        if (name==='ndR') continue
+      }else {
+        if (name==='bdR') continue
+        if (name==='imdR') continue
+      }
+      // if (pss.indexOf(name) === -1) continue
+      let nextLevel = calcHyperLevel.value[name]+1
       if (name==='imdR') nextLevel = 15
-      for (let level=hyperLevel[name]+1;level<=nextLevel;level++){
+      for (let level=calcHyperLevel.value[name]+1;level<=nextLevel;level++){
         //需要的點數
-        let point = 0
         //提升的數值
-        let val = 0
-        for (let i=hyperLevel[name]+1;i<=level;i++){
-          point += needPoints[i]
-          switch (name) {
-            case "strD":
-            case "intD":
-            case "lukD":
-            case "dexD":
-              val += 30
-              break
-            case "cdR":
-              val += 1
-              break
-            case "damR":
-            case "pmad":
-              val += 3
-              break
-            case "bdR":
-              val += i <= 5 ? 3 : 4
-              break
-            case "hpR":
-              val += 2
-              break
-          }
-        }
-        if (name==='imdR'){
-          val = level * 3
-        }
+        let {point,val} = pointAndVal(name,calcHyperLevel.value[name],level)
         if (hyperPoint < point) continue
         lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
-        const newStat = stats.value.addStat(lastStat,name,val)
-        const addResult = stats.value.calcNewData(newStat)
+        const newStat = stats.value.addStat(lastStat,name==='ndR'?'damR':name,val)
+        const addResult = stats.value.calcNewData(newStat,hyperPlan.value===0)
         const diff = addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage
         const costP = diff / point
-        console.log('continue',name,level,hyperPoint,point,diff)
+        // console.log('continue',name,level,hyperPoint,point,diff,addResult.defBossCriticalDamage,lastResult.defBossCriticalDamage)
         if (costP > bestCostP){
           bestCostP = costP
           bestName = name
@@ -234,11 +282,11 @@ function calcHyperState() {
     if (bestName==='imdR') lastImdR = bestStat.imdR
     lastStat = bestStat
     lastResult = bestResult
-    hyperLevel[bestName] = bestLevel
+    calcHyperLevel.value[bestName] = bestLevel
   }
   hyperStateLogs.value +=` \n---最終結果---\n`
-  Object.keys(hyperLevel).forEach(name=>{
-    hyperStateLogs.value +=`${props[name].replace('最終','')} ${hyperLevel[name]} 等\n`
+  Object.keys(calcHyperLevel.value).forEach(name=>{
+    hyperStateLogs.value +=`${props[name].replace('最終','')} ${calcHyperLevel.value[name]} 等\n`
   })
   hyperStateLogs.value +=`剩餘點數 ${hyperPoint} 點\n`
 
@@ -756,13 +804,31 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
               <n-collapse-item title="超級屬性" name="3">
                 <n-space vertical>
                   <n-alert :show-icon="false">
-                    計算超級屬性時建議將超級屬性初始化後更新屬性再計算，否則可能會有偏差。<br>
-                    注意先將暴擊率點到100%。<br>
-                    注意計算結果受“素質”ui中的目標防禦%影響
+                    計算超級屬性時建議先將暴擊率點到100%。<br>
+                    注意計算結果受“素質”ui中的目標防禦%影響<br>
+                    設置當前Lv後，在計算時將會自動扣除當前Lv增加的素質並返還使用的SP，所以剩餘SP僅需要填寫當前ui中顯示的剩餘SP即可。
                   </n-alert>
-                  <n-button :loading="calcHyperIng" @click="calcHyperState">
-                    點我開始計算
-                  </n-button>
+                  <template v-for="name of Object.keys(currentHyperLevel)">
+                    <n-form-item label-placement="left" :label="'當前'+props[name].replace('最終','')+'.Lv:'">
+                      <n-input-number min="0" max="15" v-model:value="currentHyperLevel[name]" />
+                    </n-form-item>
+                  </template>
+                  <n-space>
+                    <n-button :loading="calcHyperIng" @click="calcHyperState">
+                      點我開始計算
+                    </n-button>
+                    <n-radio-group v-model:value="hyperPlan" name="radiobuttongroup1">
+                      <n-radio-button
+                          v-for="plan in hyperPlans"
+                          :key="plan.value"
+                          :value="plan.value"
+                          :label="plan.label"
+                      />
+                    </n-radio-group>
+                    <n-form-item label-placement="left" label="剩餘SP：">
+                      <n-input-number placeholder="" v-model:value="currentHyperPoint" />
+                    </n-form-item>
+                  </n-space>
                   <n-log :log="hyperStateLogs"/>
                 </n-space>
               </n-collapse-item>

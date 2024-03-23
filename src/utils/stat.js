@@ -81,6 +81,7 @@ const propNames = {
     pmadD:"最終攻擊/魔法攻擊",
     pmadR:"攻擊%/魔法攻擊%",
     bdR:"BOSS傷害",
+    ndR:"一般傷害",
     str:"str",
     dex:"dex",
     int:"int",
@@ -418,7 +419,7 @@ class Stat {
             return this.calcNewData(this.data)
         })
     }
-    calcNewData(data){
+    calcNewData(data,boss=true){
         const result = {
             st:0,   //加權後屬性
             wm:0,   //武器係數
@@ -481,6 +482,12 @@ class Stat {
 
         //表功
         result.dDamage = Math.floor(result.damage * (1+data.damR/100) * (1+data.pmdR/100))
+
+        //練功
+        if (!boss){
+            result.defBossCriticalDamage = Math.floor(result.dDamage * ( 1.35 + data.cdR / 100))
+            return result
+        }
 
         //b功
         result.bDamage = Math.floor(result.damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
