@@ -77,7 +77,6 @@ for (const item of jobGroups){
 }
 
 function calcSP(t) {
-  calcStatType.value = t
   currentStep.value = 1
   showCalcStatModal.value = true
 }
@@ -339,37 +338,81 @@ function calcHexaState() {
 }
 
 const showCalcStatModal = ref(false)
-const calcStatType = ref("str")
+// const calcStatType = ref("str")
 const currentStep = ref(1);
-const calcStatResult = computed(()=>{
-  const t = calcStatType.value
-  if (stats.value.data["inc"+t]===0) {
-    return {value:0, text: "吃藥增加的屬性為0，無法計算%數"}
-  }
-  const add = stats.value.data[t+"A"] - stats.value.data[t]
-  if (add===0) {
-    return {value:0, text: "吃藥前後屬性相同，無法計算%數"}
-  }
-  // showCalcStatModal.value = false
-  let value = 0,text = ""
-  switch (t) {
-    case "str":
-    case "int":
-    case "luk":
-    case "dex":
-      value = Math.ceil((add / stats.value.data["inc"+t] - 1) * 100)
-      //四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%
-      text = `${props[t]}%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%=(((${stats.value.data[t+"A"]} - ${stats.value.data[t]}) ÷ ${stats.value.data["inc"+t]} - 1) ÷ 100)%=${value}%`
-      break
-    case "hp":
-      const chp = add / stats.value.data["inc"+t] * 100
-      value = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
-      //hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
-      text = `${props[t]}%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%(((${stats.value.data[t]} - ${stats.value.data[t+"D"]}) ÷ ((${stats.value.data[t+"A"]} - ${stats.value.data[t]}) ÷ ${stats.value.data["inc"+t]}% × 100) - 1) × 100)%=${value}%`
-      break
-  }
-  return {value, text}
+const calcStatTempData = ref({
+  strA:0,
+  dexA:0,
+  intA:0,
+  lukA:0,
+  hpA:0,
+  incstr:0,
+  incdex:0,
+  incint:0,
+  incluk:0,
+  inchp:0,
 })
+const calcStatResult = computed(()=>{
+  const result = {
+    strT:'',
+    dexT:'',
+    intT:'',
+    lukT:'',
+    hpT:'',
+    strC:false,
+    dexC:false,
+    intC:false,
+    lukC:false,
+    hpC:false,
+    strV:0,
+    dexV:0,
+    intV:0,
+    lukV:0,
+    hpV:0,
+  }
+  for (const t of statNames){
+    if (!statIsShow(t)) continue
+    result[t+'C'] = false
+    result[t+'T'] = ''
+    result[t+'V'] = 0
+    if (calcStatTempData.value["inc"+t]===0) {
+      result[t+'T'] = `吃藥增加的屬性為0，無法計算${props[t]}%數，不更新。`
+      continue
+    }
+    const add = calcStatTempData.value[t+"A"] - stats.value.data[t]
+    if (add===0) {
+      result[t+'T'] = `吃藥前後屬性相同，無法計算${props[t]}%數，不更新。`
+      continue
+    }
+    switch (t) {
+      case "str":
+      case "int":
+      case "luk":
+      case "dex":
+        result[t+'V'] = Math.ceil((add / calcStatTempData.value["inc"+t] - 1) * 100)
+        //四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%
+        result[t+'T'] = `${props[t]}%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%=(((${calcStatTempData.value[t+"A"]} - ${stats.value.data[t]}) ÷ ${calcStatTempData.value["inc"+t]} - 1) ÷ 100)%=${result[t+'V']}%，點擊更新按鈕後將更新。`
+        result[t+'C'] = true
+        break
+      case "hp":
+        const chp = add / calcStatTempData.value["inc"+t] * 100
+        result[t+'V'] = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
+        //hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
+        result[t+'T'] = `${props[t]}%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)% = (((${stats.value.data[t]} - ${stats.value.data[t+"D"]}) ÷ ((${calcStatTempData.value[t+"A"]} - ${stats.value.data[t]}) ÷ ${calcStatTempData.value["inc"+t]}% × 100) - 1) × 100)%=${result[t+'V']}%，點擊更新按鈕後將更新。\``
+        result[t+'C'] = true
+        break
+    }
+  }
+
+  return result
+})
+function updateCalcStatResult(){
+  const result = calcStatResult.value
+  for(const t of statNames){
+    if (result[t+'C']) stats.value.data[t+'R'] = result[t+'V']
+  }
+  showCalcStatModal.value = false
+}
 
 const addBuff = ref({
   key:"pmad",
@@ -510,6 +553,9 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                   <n-alert :show-icon="false">
                     每種屬性欄，左側填入ui上現在顯示的屬性右側填入ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性相加的結果（惡復不加極限屬性）
                   </n-alert>
+                  <n-button @click="calcSP(s)">
+                    計算屬性%
+                  </n-button>
                   <n-grid item-responsive responsive="screen">
                     <template v-for="s in statNames">
                       <n-form-item-gi :label="statLabel(s)" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
@@ -526,10 +572,6 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                             </template>
                             <span>填入不受%加成的{{props[s]}}，<br>來源有ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性等<br>（惡復極限屬性受%加成）</span>
                           </n-popover>
-                        </n-input-group>
-                      </n-form-item-gi>
-                      <n-form-item-gi span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
-                        <n-input-group>
                           <n-popover trigger="hover">
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
@@ -540,9 +582,6 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                             </template>
                             <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
                           </n-popover>
-                          <n-button @click="calcSP(s)">
-                            重算%
-                          </n-button>
                         </n-input-group>
                       </n-form-item-gi>
                     </template>
@@ -786,33 +825,48 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
           </n-steps>
           <n-space vertical v-show="currentStep===1">
             <n-alert :show-icon="false">
-              填寫現在的ui上顯示的總{{props[calcStatType]}}
+              填寫現在的ui上顯示的屬性值
             </n-alert>
-            <n-input-number v-model:value="stats.data[calcStatType]" />
+            <template v-for="s in statNames">
+              <n-form-item :label="statLabel(s)" span="24" v-if="statIsShow(s)">
+                <n-input-number v-model:value="stats.data[s]" />
+              </n-form-item>
+            </template>
           </n-space>
           <n-space vertical v-show="currentStep===2">
             <n-alert :show-icon="false">
               請在遊戲內吃藥（推薦拍賣拉最上級祝福秘藥、傳說中的祝福秘藥等全屬性增加固定數值的秘藥）或穿/脫塔戒，並填寫增加的原始屬性值（e.g:脫下塔戒，則填寫“-4”），惡復使用三轉技能“急速療癒”或五轉技能“聖火”，填寫數值一般為25%或40%
             </n-alert>
-            <n-input-number v-model:value="stats.data['inc'+calcStatType]">
-              <template v-if="calcStatType==='hp'" #suffix>
-                %
-              </template>
-            </n-input-number>
+            <template v-for="s in statNames">
+              <n-form-item :label="statLabel(s)+'應增加'" span="24" v-if="statIsShow(s)">
+                <n-input-number v-model:value="calcStatTempData['inc'+s]">
+                  <template v-if="s==='hp'" #suffix>
+                    %
+                  </template>
+                </n-input-number>
+              </n-form-item>
+            </template>
           </n-space>
           <n-space vertical v-show="currentStep===3">
             <n-alert :show-icon="false">
-              填寫現在的ui上顯示的總{{props[calcStatType]}}
+              填寫現在的ui上顯示的屬性值
             </n-alert>
-            <n-input-number v-model:value="stats.data[calcStatType+'A']" />
+            <template v-for="s in statNames">
+              <n-form-item :label="statLabel(s)" span="24" v-if="statIsShow(s)">
+                <n-input-number v-model:value="calcStatTempData[s+'A']" />
+              </n-form-item>
+            </template>
           </n-space>
           <n-space vertical v-show="currentStep===4">
             <n-alert :show-icon="false">
-              {{calcStatResult.text}}<br>
-              點更新按鈕將{{props[calcStatType]}}更新為{{calcStatResult.value}}%
+              <template v-for="s in statNames">
+                <template v-if="statIsShow(s)">
+                  {{calcStatResult[s+'T']}}<br>
+                </template>
+              </template>
             </n-alert>
             <n-space justify="center">
-              <n-button @click="stats.data[calcStatType+'R']=calcStatResult.value;showCalcStatModal=false" type="success">
+              <n-button @click="updateCalcStatResult" type="success">
                 更新
               </n-button>
             </n-space>

@@ -1,6 +1,6 @@
 import {debounce} from "@/utils/debounce.js";
 
-const ver = 1
+const ver = 2
 const v1 = {
     level:0,//等級
     job:null,//職業/武器
@@ -38,9 +38,37 @@ const v1 = {
     incluk:0,
     inchp:0,
 }
+const v2 = {
+    level:0,//等級
+    job:null,//職業/武器
+    damR:0,//傷害
+    pmdR:0,//最終傷害
+    imdR:[],//無視防禦率
+    cdR:0,//爆擊傷害
+    pmad:0,//攻擊力/魔法攻擊力
+    pmadR:0,//攻擊力%/魔法攻擊力%
+    pmadD:0,//最終攻擊力/魔法攻擊力
+    bdR:0,//BOSS傷害
+    str:0,
+    dex:0,
+    int:0,
+    luk:0,
+    hp:0,
+    strR:0,
+    dexR:0,
+    intR:0,
+    lukR:0,
+    hpR:0,
+    strD:0,
+    dexD:0,
+    intD:0,
+    lukD:0,
+    hpD:0,
+}
 
 const verMap = {
     1:v1,
+    2:v2,
 }
 const propNames = {
     level:"等級",
@@ -81,7 +109,7 @@ const propNames = {
     inchp:"吃藥增加hp",
     hexaStat:"主屬",
 }
-const data = v1
+const data = v2
 
 const jobGroups = [
     {name:"冒險家劍士",child:[1121,1122,1221,1222,132]},
