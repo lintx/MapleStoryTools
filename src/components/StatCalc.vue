@@ -154,8 +154,18 @@ const calcHyperLevel = ref({})
 for (const name of Object.keys(currentHyperLevel.value)){
   calcHyperLevel.value[name] = 0
 }
+function numToRate(num){
+  let p = 1_00
+  num *= p * 100
+  while(num < 10){
+    p *= 10
+    num *= 10
+  }
+  return (Math.round(num) / p).toFixed(p.toFixed().length-1) + '%'
+}
 function calcHyperState() {
   const needPoints = [0 ,1, 2, 4, 8, 10, 15, 20, 25, 30, 35, 50, 65, 80, 95, 110]
+  //計算極限屬性從某個等級到某個等級所需要的點數和增加的屬性
   function pointAndVal(name,startLevel,currentLevel){
     //需要的點數
     let point = 0
@@ -194,8 +204,40 @@ function calcHyperState() {
       val
     }
   }
-  calcHyperIng.value = true
-  hyperStateLogs.value = ""
+
+  /**
+   * 生成所有可能的屬性提升方案
+   * @param names 所有屬性
+   * @param index 現在計算的屬性索引
+   * @param max 現在計算的屬性最大等級
+   * @param temp 現在計算的屬性提升方案
+   * @param result 所有可能的屬性提升方案集合
+   * @param point 剩餘屬性點數
+   */
+  function generatePlans(names,index,max,temp,result,point){
+    if(index===names.length){
+      for(const name in temp){
+        if(temp[name] < max && point >= needPoints[temp[name]+1]) return
+      }
+      temp.point = point
+      result.push(temp)
+      return
+    }
+    let _point = point
+    for(let i=temp[names[index]];i<=max;i++){
+      if(i!==temp[names[index]]) {
+        _point -= needPoints[i]
+        if (_point < 0){
+          return
+        }
+      }
+      const copy = Object.assign({},temp)
+      copy[names[index]] = i
+      generatePlans(names,index+1,max,copy,result,_point)
+    }
+  }
+  calcHyperIng.value = true //正在計算
+  hyperStateLogs.value = "" //清空日誌
   //用於比較的屬性，初始是當前屬性
   let lastStat = stats.value.addStat(stats.value.data,"")
   if (lastStat.level < 140){
@@ -208,63 +250,79 @@ function calcHyperState() {
     calcHyperIng.value = false
     return
   }
+  //算出初始素質
+  const initialResult = stats.value.calcNewData(lastStat,hyperPlan.value===0)
   //屬性點數
   let hyperPoint = currentHyperPoint.value
+  //當前職業主副屬
+  const pss = []
+  for (const ps of jobs[lastStat.job].ps){
+    pss.push(ps==='hp'?'hpR':ps+'D')
+  }
+  for (const ss of jobs[lastStat.job].ss){
+    pss.push(ss==='hp'?'hpR':ss+'D')
+  }
   //扣除舊屬性，返還SP
+  let tempPlan = {}
   for (const name of Object.keys(currentHyperLevel.value)){
     const {point,val} = pointAndVal(name,0,currentHyperLevel.value[name])
+    // console.log(props[name]+currentHyperLevel.value[name]+',返還點數' + point + ",屬性" + val)
     hyperPoint += point
     stats.value.addStat(lastStat,name,-val,false)
     calcHyperLevel.value[name] = 0
+
+    //只從有提升的屬性中計算
+    if (hyperPlan.value===0 ){
+      if (name==='ndR') continue
+    }else {
+      if (name==='bdR') continue
+      if (name==='imdR') continue
+    }
+    if (['hpR','strD','intD','lukD','dexD'].indexOf(name) >= 0 && pss.indexOf(name)===-1) continue
+    tempPlan[name] = 0
   }
   // console.log(lastStat)
 
   const initialImdR = lastStat.imdR
-  // for (let i=140;i<=lastStat.level;i++){
-  //   hyperPoint += Math.floor(3 + (i-140)/10)
-  // }
   hyperStateLogs.value += `超級屬性點總計${hyperPoint}\n`
-  hyperStateLogs.value +=` \n---提升順序---\n`
-  //升級會帶來打王提升的超級屬性
-  // const pss = []
-  // for (const ps of jobs[lastStat.job].ps){
-  //   pss.push(ps)
-  // }
-  // for (const ss of jobs[lastStat.job].ss){
-  //   pss.push(ss)
-  // }
+  // hyperStateLogs.value +=` \n---提升順序---\n`
 
+  //用於比較的面板
   let lastResult = stats.value.calcNewData(lastStat,hyperPlan.value===0)
+  // console.log(lastResult.imdr)
   let lastImdR = initialImdR
+  const planNames = Object.keys(tempPlan) //屬性名
+  let minPoint = Math.ceil(hyperPoint/3) //剩餘1/3點數時即終止性價比計算，改為所有組合的遍歷計算
   for (;;){
-    let bestResult = lastResult
-    let bestCostP = 0
-    let bestName = ""
-    let bestLevel = 0
-    let bestPoint = 0
-    let bestStat = lastStat
+    //性價比計算法，前2/3點數按性價比進行計算
+    let bestResult = lastResult //當前最好的結果
+    let bestCostP = 0 //最高性價比
+    let bestName = "" //最高性價比屬性
+    let bestLevel = 0 //最高性價比屬性等級
+    let bestPoint = 0 //最高性價比屬性需要的點數
+    let bestStat = lastStat //當前最好的結果的屬性
     let bestDiff = 0
-    for (const name of Object.keys(calcHyperLevel.value)){
-      if (hyperPlan.value===0 ){
-        if (name==='ndR') continue
-      }else {
-        if (name==='bdR') continue
-        if (name==='imdR') continue
-      }
-      // if (pss.indexOf(name) === -1) continue
-      let nextLevel = calcHyperLevel.value[name]+1
+    for (const name of planNames){
+      //計算每種屬性提升到下一個等級的性價比（無視防禦每次都計算到最高等）
+      let nextLevel = tempPlan[name]+1
       if (name==='imdR') nextLevel = 15
-      for (let level=calcHyperLevel.value[name]+1;level<=nextLevel;level++){
+      for (let level=tempPlan[name]+1;level<=nextLevel;level++){
         //需要的點數
         //提升的數值
-        let {point,val} = pointAndVal(name,calcHyperLevel.value[name],level)
+        let {point,val} = pointAndVal(name,tempPlan[name],level)
         if (hyperPoint < point) continue
+        //如果計算的是無視防禦，則在初始無視的基礎上加算，否則使用最後計算時的無視，這是因為無視作為整體數據不能拆分加算
         lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
+        //加上本次加點的屬性
         const newStat = stats.value.addStat(lastStat,name==='ndR'?'damR':name,val)
+        //計算加點後的素質
         const addResult = stats.value.calcNewData(newStat,hyperPlan.value===0)
+        //計算加點後增加的素質
         const diff = addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage
+        //計算性價比
         const costP = diff / point
-        // console.log('continue',name,level,hyperPoint,point,diff,addResult.defBossCriticalDamage,lastResult.defBossCriticalDamage)
+        // console.log('continue',props[name],name,level,hyperPoint,point,diff,addResult.defBossCriticalDamage,lastResult.defBossCriticalDamage)
+        //性價比更好的話，就暫時保留本次加點的結果
         if (costP > bestCostP){
           bestCostP = costP
           bestName = name
@@ -276,19 +334,87 @@ function calcHyperState() {
         }
       }
     }
+    //如果最佳性價比等於0，則表示沒有任何提升
     if (bestCostP === 0) break
+    //扣除加點的點數
     hyperPoint -= bestPoint
-    hyperStateLogs.value += `提升${props[bestName].replace('最終','')}至${bestLevel}等，提升防後b攻${bestDiff}，花費${bestPoint}點，性價比${Math.round(bestCostP)}，剩餘點數${hyperPoint}\n`
+    // hyperStateLogs.value += `提升${props[bestName].replace('最終','')}至${bestLevel}等，提升防後b攻${bestDiff}，花費${bestPoint}點，性價比${Math.round(bestCostP)}，剩餘點數${hyperPoint}\n`
+    //緩存本次加點的無視
     if (bestName==='imdR') lastImdR = bestStat.imdR
-    lastStat = bestStat
-    lastResult = bestResult
-    calcHyperLevel.value[bestName] = bestLevel
+    lastStat = bestStat //緩存本次加點的屬性
+    lastResult = bestResult //緩存本次加點的素質結果
+    tempPlan[bestName] = bestLevel  //進行加點
+    if (hyperPoint <= minPoint) break //剩餘點數低於保留點數時終止性價比算法，轉為貪心算法
   }
+
+  const allPlans = []
+  //生成所有可能的方案
+  generatePlans(planNames,0,15,tempPlan,allPlans,hyperPoint);
+  // let testPlan = {
+  //   intD:5,
+  //   lukD:4,
+  //   cdR:12,
+  //   imdR:12,
+  //   damR:13,
+  //   bdR:14,
+  //   pmad:7,
+  //   point:2,
+  // }
+  // allPlans.push(testPlan);
+  (()=>{
+    let bestStat = lastStat //最好的屬性
+    let bestResult = lastResult //最高傷害
+    let bestPlan = tempPlan //最好的方案
+    for (const plan of allPlans){
+      //複製一份屬性
+      let newStat = stats.value.addStat(lastStat,"")
+      newStat.imdR = initialImdR  //更換為初始無視，因為無視需要整體運算
+      for (const name in plan){
+        if (name !== "point"){
+          let {val} = pointAndVal(name,tempPlan[name],plan[name]) //算出增加的屬性值
+          newStat = stats.value.addStat(newStat,name==='ndR'?'damR':name,val,name==='imdR') //算出增加後的屬性，如果是無視時則使用複製模式，否則直接增加
+        }
+      }
+      const newResult = stats.value.calcNewData(newStat,hyperPlan.value===0)  //算出新的素質
+      // if (plan===testPlan){
+      //   console.log("testPlan:" + newResult.defBossCriticalDamage)
+      // }
+      //比對新的素質結果
+      if (newResult.defBossCriticalDamage > bestResult.defBossCriticalDamage){
+        bestStat = newStat
+        bestResult = newResult
+        bestPlan = plan
+      }
+    }
+    tempPlan = bestPlan
+    lastResult = bestResult
+    lastStat = bestStat
+  })()
+
   hyperStateLogs.value +=` \n---最終結果---\n`
-  Object.keys(calcHyperLevel.value).forEach(name=>{
-    hyperStateLogs.value +=`${props[name].replace('最終','')} ${calcHyperLevel.value[name]} 等\n`
+  planNames.forEach(name=>{
+    hyperStateLogs.value +=`${props[name].replace('最終','')} ${tempPlan[name]} 等\n`
+    calcHyperLevel.value[name] = tempPlan[name]
   })
-  hyperStateLogs.value +=`剩餘點數 ${hyperPoint} 點\n`
+
+  hyperStateLogs.value +=`剩餘點數 ${tempPlan.point} 點\n`
+  // console.log(lastStat,lastResult)
+  if (hyperPlan.value===0){
+    hyperStateLogs.value +=`防後爆B攻 ${numberFormat.value(lastResult.defBossCriticalDamage)}\n`
+  }else {
+    hyperStateLogs.value +=`一般攻 ${numberFormat.value(lastResult.defBossCriticalDamage)}\n`
+  }
+  let diff = lastResult.defBossCriticalDamage - initialResult.defBossCriticalDamage
+  if (diff > 0){
+    //提升
+    hyperStateLogs.value +=`相較於現在的方案，新方案提升了${numToRate(diff / lastResult.defBossCriticalDamage)}\n`
+  }else if (diff === 0){
+    //無提升
+    hyperStateLogs.value +=`你現在的方案已經是最佳方案了。\n`
+  }else {
+    //下降
+    hyperStateLogs.value +=`你現在的方案比計算機計算的方案更好，這說明計算機的算法有待改進，如果可以的話，是否可以前往github或巴哈將您的數據反饋給作者以便改進？\n`
+  }
 
   calcHyperIng.value = false
 }
