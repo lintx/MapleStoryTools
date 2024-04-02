@@ -1,6 +1,6 @@
 import {debounce} from "@/utils/debounce.js";
 
-const ver = 2
+const ver = 3
 const v1 = {
     level:0,//等級
     job:null,//職業/武器
@@ -65,10 +65,39 @@ const v2 = {
     lukD:0,
     hpD:0,
 }
+const v3 = {
+    level:0,//等級
+    job:null,//職業/武器
+    damR:0,//傷害
+    pmdR:0,//最終傷害
+    imdR:[],//無視防禦率
+    cdR:0,//爆擊傷害
+    pmad:0,//攻擊力/魔法攻擊力
+    pmadR:0,//攻擊力%/魔法攻擊力%
+    pmadD:0,//最終攻擊力/魔法攻擊力
+    bdR:0,//BOSS傷害
+    ndR:0,
+    str:0,
+    dex:0,
+    int:0,
+    luk:0,
+    hp:0,
+    strR:0,
+    dexR:0,
+    intR:0,
+    lukR:0,
+    hpR:0,
+    strD:0,
+    dexD:0,
+    intD:0,
+    lukD:0,
+    hpD:0,
+}
 
 const verMap = {
     1:v1,
     2:v2,
+    3:v3,
 }
 const propNames = {
     level:"等級",
@@ -110,7 +139,7 @@ const propNames = {
     inchp:"吃藥增加hp",
     hexaStat:"主屬",
 }
-const data = v2
+const data = v3
 
 const jobGroups = [
     {name:"冒險家劍士",child:[1121,1122,1221,1222,132]},
@@ -422,13 +451,14 @@ class Stat {
             return this.calcNewData(this.data)
         })
     }
-    calcNewData(data,boss=true){
+    calcNewData(data){
         const result = {
             st:0,   //加權後屬性
             wm:0,   //武器係數
             imdr:0, //無視
             damage:0,   //真攻
             bDamage:0,  //b功
+            nDamage:0,  //b功
             dDamage:0,  //表功
             remainingDef:0, //有效傷害比
             defBDamage:0,   //有效b功
@@ -465,17 +495,17 @@ class Stat {
         switch (data.job) {
             case "3122":
                 let chp = 545 + 90 * data.level
-                result.st = Math.floor(chp / 3.5) + 0.8 * Math.floor((data.hp - chp) / 3.5) + data.str
+                result.st = Math.floor(chp / 3.5) + 0.8 * Math.floor((data.hp * (1+data['hpR']/100) + data.hpD - chp) / 3.5) + data.str * (1+data['strR']/100) + data.strD
                 break
             case "3612":
-                result.st = (data.str + data.luk + data.dex) * 3
+                result.st = (data.str * (1+data['strR']/100) + data.strD + data.luk * (1+data['lukR']/100) + data.lukD + data.dex + (1+data['dexR']/100) + data.dexD) * 3
                 break
             default:
                 for (const s of jobs[data.job].ps){
-                    result.st += data[s] * 4
+                    result.st += (data[s] * (1+data[s+'R']/100) + data[s+'D']) * 4
                 }
                 for (const s of jobs[data.job].ss){
-                    result.st += data[s]
+                    result.st += data[s] * (1+data[s+'R']/100) + data[s+'D']
                 }
         }
 
@@ -487,10 +517,7 @@ class Stat {
         result.dDamage = Math.floor(result.damage * (1+data.damR/100) * (1+data.pmdR/100))
 
         //練功
-        if (!boss){
-            result.defBossCriticalDamage = Math.floor(result.dDamage * ( 1.35 + data.cdR / 100))
-            return result
-        }
+        result.nDamage = Math.floor(result.damage * (1+data.damR/100+data.ndR/100) * (1+data.pmdR/100))
 
         //b功
         result.bDamage = Math.floor(result.damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
@@ -529,35 +556,35 @@ class Stat {
                     data[name].push(val)
                 }
                 break
-            case "hp":
-            case "str":
-            case "int":
-            case "luk":
-            case "dex":
-                // data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
-                data[name] += val * (1+source[name+'R']/100)
-                break
-            case "hpD":
-            case "strD":
-            case "intD":
-            case "lukD":
-            case "dexD":
-                let sdn = name.substring(0,name.length-1)
-                data[sdn] += val
-                data[name] += val
-                break
-            case "hpR":
-            case "strR":
-            case "intR":
-            case "lukR":
-            case "dexR":
-                let sn = name.substring(0,name.length-1)
-                data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[name]/100)) * (1+(source[name] + val)/100) + source[sn+'D']
-                data[name] += val
-                break
+            // case "hp":
+            // case "str":
+            // case "int":
+            // case "luk":
+            // case "dex":
+            //     // data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
+            //     data[name] += val * (1+source[name+'R']/100)
+            //     break
+            // case "hpD":
+            // case "strD":
+            // case "intD":
+            // case "lukD":
+            // case "dexD":
+            //     let sdn = name.substring(0,name.length-1)
+            //     data[sdn] += val
+            //     data[name] += val
+            //     break
+            // case "hpR":
+            // case "strR":
+            // case "intR":
+            // case "lukR":
+            // case "dexR":
+            //     let sn = name.substring(0,name.length-1)
+            //     data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[name]/100)) * (1+(source[name] + val)/100) + source[sn+'D']
+            //     data[name] += val
+            //     break
             case "atR":
                 for (const san of ['str','int','luk','dex']){
-                    data[san] = ((source[san] - source[san+"D"]) / (1+source[san+"R"]/100)) * (1+(source[san+'R'] + val)/100) + source[san+'D']
+                    // data[san] = ((source[san] - source[san+"D"]) / (1+source[san+"R"]/100)) * (1+(source[san+'R'] + val)/100) + source[san+'D']
                     data[san+'R'] += val
                 }
                 break
@@ -661,38 +688,38 @@ class Stat {
                 case "3122":
                     result['strD'] = formatFloat(diffSt)
                     result['str'] = formatFloat((diffSt / (1+this.data['strR']/100)))
-                    result['strR'] = formatFloat((diffSt / ((this.data['str'] - this.data['strD']) / (1 + this.data['strR']/100)) * 100))
+                    result['strR'] = formatFloat((diffSt / this.data['str'] * 100))
 
                     result['hpD'] = formatFloat((diffSt / 0.8 * 3.5))
                     result['hp'] = formatFloat((diffSt / 0.8 * 3.5 / (1+this.data['hpR']/100)))
-                    result['hpR'] = formatFloat((diffSt / 0.8 * 3.5 / ((this.data['hp'] - this.data['hpD']) / (1 + this.data['hpR']/100)) * 100))
+                    result['hpR'] = formatFloat((diffSt / 0.8 * 3.5 / this.data['hp'] * 100))
 
-                    aSt += (this.data['str'] - this.data['strD']) / (1 + this.data['strR']/100)
+                    aSt += this.data['str']
                     break
                 case "3612":
                     for (const s of jobs[data.job].ps){
                         result[s+'D'] = formatFloat((diffSt / 3))
                         result[s] = formatFloat((diffSt / 3 / (1+this.data[s+'R']/100)))
-                        result[s+'R'] = formatFloat((diffSt / 3 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+                        result[s+'R'] = formatFloat((diffSt / 3 / this.data[s] * 100))
 
                         // diffAtSt -= (this.data[s] - this.data[s+'D']) * 3
-                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100) * 3
+                        aSt += this.data[s] * 3
                     }
                     break
                 default:
                     for (const s of jobs[data.job].ps){
                         result[s+'D'] = formatFloat((diffSt / 4))
                         result[s] = formatFloat((diffSt / 4 / (1+this.data[s+'R']/100)))
-                        result[s+'R'] = formatFloat((diffSt / 4 / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+                        result[s+'R'] = formatFloat((diffSt / 4 / this.data[s] * 100))
 
-                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100) * 4
+                        aSt += this.data[s] * 4
                     }
                     for (const s of jobs[data.job].ss){
                         result[s+'D'] = formatFloat(diffSt)
                         result[s] = formatFloat((diffSt / (1+this.data[s+'R']/100)))
-                        result[s+'R'] = formatFloat((diffSt / ((this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)) * 100))
+                        result[s+'R'] = formatFloat((diffSt / this.data[s] * 100))
 
-                        aSt += (this.data[s] - this.data[s+'D']) / (1 + this.data[s+'R']/100)
+                        aSt += this.data[s]
                     }
             }
             result['atR'] = formatFloat(diffSt / aSt * 100)

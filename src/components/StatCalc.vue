@@ -76,11 +76,6 @@ for (const item of jobGroups){
   jobOptions.push(child)
 }
 
-function calcSP(t) {
-  currentStep.value = 1
-  showCalcStatModal.value = true
-}
-
 function statIsShow(s) {
   return jobs.hasOwnProperty(stats.value.data.job) && (jobs[stats.value.data.job].ps.indexOf(s)>=0 || jobs[stats.value.data.job].ss.indexOf(s)>=0)
 }
@@ -251,7 +246,7 @@ function calcHyperState() {
     return
   }
   //算出初始素質
-  const initialResult = stats.value.calcNewData(lastStat,hyperPlan.value===0)
+  const initialResult = stats.value.calcNewData(lastStat)
   //屬性點數
   let hyperPoint = currentHyperPoint.value
   //當前職業主副屬
@@ -288,7 +283,7 @@ function calcHyperState() {
   // hyperStateLogs.value +=` \n---提升順序---\n`
 
   //用於比較的面板
-  let lastResult = stats.value.calcNewData(lastStat,hyperPlan.value===0)
+  let lastResult = stats.value.calcNewData(lastStat)
   // console.log(lastResult.imdr)
   let lastImdR = initialImdR
   const planNames = Object.keys(tempPlan) //屬性名
@@ -314,11 +309,11 @@ function calcHyperState() {
         //如果計算的是無視防禦，則在初始無視的基礎上加算，否則使用最後計算時的無視，這是因為無視作為整體數據不能拆分加算
         lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
         //加上本次加點的屬性
-        const newStat = stats.value.addStat(lastStat,name==='ndR'?'damR':name,val)
+        const newStat = stats.value.addStat(lastStat,name,val)
         //計算加點後的素質
-        const addResult = stats.value.calcNewData(newStat,hyperPlan.value===0)
+        const addResult = stats.value.calcNewData(newStat)
         //計算加點後增加的素質
-        const diff = addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage
+        const diff = hyperPlan.value===0 ? addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage : addResult.nDamage - lastResult.nDamage
         //計算性價比
         const costP = diff / point
         // console.log('continue',props[name],name,level,hyperPoint,point,diff,addResult.defBossCriticalDamage,lastResult.defBossCriticalDamage)
@@ -372,15 +367,16 @@ function calcHyperState() {
       for (const name in plan){
         if (name !== "point"){
           let {val} = pointAndVal(name,tempPlan[name],plan[name]) //算出增加的屬性值
-          newStat = stats.value.addStat(newStat,name==='ndR'?'damR':name,val,name==='imdR') //算出增加後的屬性，如果是無視時則使用複製模式，否則直接增加
+          newStat = stats.value.addStat(newStat,name,val,name==='imdR') //算出增加後的屬性，如果是無視時則使用複製模式，否則直接增加
         }
       }
-      const newResult = stats.value.calcNewData(newStat,hyperPlan.value===0)  //算出新的素質
+      const newResult = stats.value.calcNewData(newStat)  //算出新的素質
       // if (plan===testPlan){
       //   console.log("testPlan:" + newResult.defBossCriticalDamage)
       // }
       //比對新的素質結果
-      if (newResult.defBossCriticalDamage > bestResult.defBossCriticalDamage){
+      const diff = hyperPlan.value===0 ? newResult.defBossCriticalDamage - bestResult.defBossCriticalDamage : newResult.nDamage - bestResult.nDamage
+      if (diff > 0){
         bestStat = newStat
         bestResult = newResult
         bestPlan = plan
@@ -402,7 +398,7 @@ function calcHyperState() {
   if (hyperPlan.value===0){
     hyperStateLogs.value +=`防後爆B攻 ${numberFormat.value(lastResult.defBossCriticalDamage)}\n`
   }else {
-    hyperStateLogs.value +=`一般攻 ${numberFormat.value(lastResult.defBossCriticalDamage)}\n`
+    hyperStateLogs.value +=`一般攻 ${numberFormat.value(lastResult.nDamage)}\n`
   }
   let diff = lastResult.defBossCriticalDamage - initialResult.defBossCriticalDamage
   if (diff > 0){
@@ -511,83 +507,6 @@ function calcHexaState() {
   calcHexaIng.value = false
 }
 
-const showCalcStatModal = ref(false)
-// const calcStatType = ref("str")
-const currentStep = ref(1);
-const calcStatTempData = ref({
-  strA:0,
-  dexA:0,
-  intA:0,
-  lukA:0,
-  hpA:0,
-  incstr:0,
-  incdex:0,
-  incint:0,
-  incluk:0,
-  inchp:0,
-})
-const calcStatResult = computed(()=>{
-  const result = {
-    strT:'',
-    dexT:'',
-    intT:'',
-    lukT:'',
-    hpT:'',
-    strC:false,
-    dexC:false,
-    intC:false,
-    lukC:false,
-    hpC:false,
-    strV:0,
-    dexV:0,
-    intV:0,
-    lukV:0,
-    hpV:0,
-  }
-  for (const t of statNames){
-    if (!statIsShow(t)) continue
-    result[t+'C'] = false
-    result[t+'T'] = ''
-    result[t+'V'] = 0
-    if (calcStatTempData.value["inc"+t]===0) {
-      result[t+'T'] = `吃藥增加的屬性為0，無法計算${props[t]}%數，不更新。`
-      continue
-    }
-    const add = calcStatTempData.value[t+"A"] - stats.value.data[t]
-    if (add===0) {
-      result[t+'T'] = `吃藥前後屬性相同，無法計算${props[t]}%數，不更新。`
-      continue
-    }
-    switch (t) {
-      case "str":
-      case "int":
-      case "luk":
-      case "dex":
-        result[t+'V'] = Math.ceil((add / calcStatTempData.value["inc"+t] - 1) * 100)
-        //四大屬性%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%
-        result[t+'T'] = `${props[t]}%=(((吃藥後 - 吃藥前) ÷ 吃藥增加量 - 1) ÷ 100)%=(((${calcStatTempData.value[t+"A"]} - ${stats.value.data[t]}) ÷ ${calcStatTempData.value["inc"+t]} - 1) ÷ 100)%=${result[t+'V']}%，點擊更新按鈕後將更新。`
-        result[t+'C'] = true
-        break
-      case "hp":
-        const chp = add / calcStatTempData.value["inc"+t] * 100
-        result[t+'V'] = Math.ceil(((stats.value.data[t] - stats.value.data[t+"D"]) / chp - 1) * 100)
-        //hp%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)%
-        result[t+'T'] = `${props[t]}%=(((吃藥前 - 最終hp) ÷ ((吃藥後 - 吃藥前) ÷ 吃藥增加量% × 100) - 1) × 100)% = (((${stats.value.data[t]} - ${stats.value.data[t+"D"]}) ÷ ((${calcStatTempData.value[t+"A"]} - ${stats.value.data[t]}) ÷ ${calcStatTempData.value["inc"+t]}% × 100) - 1) × 100)%=${result[t+'V']}%，點擊更新按鈕後將更新。\``
-        result[t+'C'] = true
-        break
-    }
-  }
-
-  return result
-})
-function updateCalcStatResult(){
-  const result = calcStatResult.value
-  for(const t of statNames){
-    if (result[t+'C']) stats.value.data[t+'R'] = result[t+'V']
-  }
-  showCalcStatModal.value = false
-}
-
 const addBuff = ref({
   key:"pmad",
   val:1,
@@ -647,38 +566,35 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                         </template>
                       </n-input-number>
                     </n-form-item-gi>
-                    <n-form-item-gi :label="props.pmad" :span="gis">
-                      <n-popover trigger="hover">
-                        <template #trigger>
-                          <n-input-number min="0" v-model:value="stats.data.pmad">
-                          </n-input-number>
-                        </template>
-                        <span>填入未受%加成的{{props.pmadR}}，<br>可以由ui數值÷%得到，<br>也可以由滑鼠放上去後條目累加得到</span>
-                      </n-popover>
+                    <n-form-item-gi :label="props.pmad+'基本數值'" :span="gis">
+                      <n-input-number min="0" v-model:value="stats.data.pmad">
+                      </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmadR" :span="gis">
-                      <n-popover trigger="hover">
-                        <template #trigger>
-                          <n-input-number min="0" v-model:value="stats.data.pmadR">
-                            <template #suffix>
-                              %
-                            </template>
-                          </n-input-number>
+                      <n-input-number min="0" v-model:value="stats.data.pmadR">
+                        <template #suffix>
+                          %
                         </template>
-                        <span>填入{{props.pmadR}}總和，<br>滑鼠放上{{props.pmadR}}後，<br>在展開的ui中可以看到</span>
-                      </n-popover>
+                      </n-input-number>
                     </n-form-item-gi>
-                    <n-form-item-gi :label="props.pmadD" :span="gis">
+                    <n-form-item-gi :label="props.pmad+'%未套用數值'" :span="gis">
                       <n-popover trigger="hover">
                         <template #trigger>
                           <n-input-number min="0" v-model:value="stats.data.pmadD">
                           </n-input-number>
                         </template>
-                        <span>填入不受%加成的{{props.pmadR}}，<br>目前只有陰陽師HP轉換等少數{{props.pmadR}}不受%加成，一般職業填0即可</span>
+                        <span>填入{{props.pmad}}%未套用數值，<br>目前只有陰陽師HP轉換等少數{{props.pmad}}不受%加成，一般職業填0即可</span>
                       </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.bdR" :span="gis">
                       <n-input-number min="0" v-model:value="stats.data.bdR">
+                        <template #suffix>
+                          %
+                        </template>
+                      </n-input-number>
+                    </n-form-item-gi>
+                    <n-form-item-gi :label="props.ndR" :span="gis">
+                      <n-input-number min="0" v-model:value="stats.data.ndR">
                         <template #suffix>
                           %
                         </template>
@@ -725,11 +641,8 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
               <n-collapse-item title="主副屬" name="4">
                 <n-space vertical>
                   <n-alert :show-icon="false">
-                    每種屬性欄，左側填入ui上現在顯示的屬性右側填入ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性相加的結果（惡復不加極限屬性）
+                    每種屬性欄，左側填入ui上現在顯示的基礎數值，中間填入%未套用數值，右側填入%數值
                   </n-alert>
-                  <n-button @click="calcSP(s)">
-                    計算屬性%
-                  </n-button>
                   <n-grid item-responsive responsive="screen">
                     <template v-for="s in statNames">
                       <n-form-item-gi :label="statLabel(s)" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
@@ -738,13 +651,13 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s]" />
                             </template>
-                            <span>填入ui上顯示的{{props[s]}}</span>
+                            <span>填入ui上顯示的{{props[s]}}基礎數值</span>
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s+'D']" />
                             </template>
-                            <span>填入不受%加成的{{props[s]}}，<br>來源有ARC、AUT、極限屬性、聯盟角色卡、內潛、HEXA屬性等<br>（惡復極限屬性受%加成）</span>
+                            <span>填入{{props[s]}}%未套用數值</span>
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
@@ -754,7 +667,7 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                                 </template>
                               </n-input-number>
                             </template>
-                            <span>填入{{props[s+'R']}}總和，也可以填入前面數值後按重算%按鈕自動重算</span>
+                            <span>填入{{props[s+'R']}}數值</span>
                           </n-popover>
                         </n-input-group>
                       </n-form-item-gi>
@@ -845,6 +758,14 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                         B攻：{{numberFormat(stats.calcData().value.bDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害% + B傷%) × (100% + 總傷%)</span>
+                    </n-popover>
+                  </n-gi>
+                  <n-gi :span="gis">
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        一般：{{numberFormat(stats.calcData().value.nDamage)}}
+                      </template>
+                      <span>真攻 × (100% + 傷害% + 一般傷害%) × (100% + 總傷%)</span>
                     </n-popover>
                   </n-gi>
                   <n-form-item-gi label-placement="left" label="目標防禦%" :span="gis">
@@ -996,90 +917,6 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
 <!--      </n-space>-->
 <!--    </template>-->
   </n-page-header>
-  <n-modal
-      v-model:show="showCalcStatModal"
-      :mask-closable="false"
-  >
-    <n-card
-        :bordered="false"
-        size="huge"
-        role="dialog"
-        aria-modal="true"
-        style="width: 100%; max-width: calc(100vw - 32px);"
-    >
-      <n-form>
-        <n-space vertical>
-          <n-steps size="small" :current="currentStep">
-            <n-step title="填寫屬性" />
-            <n-step title="吃藥" />
-            <n-step title="填寫屬性" />
-            <n-step title="計算結果" />
-          </n-steps>
-          <n-space vertical v-show="currentStep===1">
-            <n-alert :show-icon="false">
-              填寫現在的ui上顯示的屬性值
-            </n-alert>
-            <template v-for="s in statNames">
-              <n-form-item :label="statLabel(s)" span="24" v-if="statIsShow(s)">
-                <n-input-number v-model:value="stats.data[s]" />
-              </n-form-item>
-            </template>
-          </n-space>
-          <n-space vertical v-show="currentStep===2">
-            <n-alert :show-icon="false">
-              請在遊戲內吃藥（推薦拍賣拉最上級祝福秘藥、傳說中的祝福秘藥等全屬性增加固定數值的秘藥）或穿/脫塔戒，並填寫增加的原始屬性值（e.g:脫下塔戒，則填寫“-4”），惡復使用三轉技能“急速療癒”或五轉技能“聖火”，填寫數值一般為25%或40%
-            </n-alert>
-            <template v-for="s in statNames">
-              <n-form-item :label="statLabel(s)+'應增加'" span="24" v-if="statIsShow(s)">
-                <n-input-number v-model:value="calcStatTempData['inc'+s]">
-                  <template v-if="s==='hp'" #suffix>
-                    %
-                  </template>
-                </n-input-number>
-              </n-form-item>
-            </template>
-          </n-space>
-          <n-space vertical v-show="currentStep===3">
-            <n-alert :show-icon="false">
-              填寫現在的ui上顯示的屬性值
-            </n-alert>
-            <template v-for="s in statNames">
-              <n-form-item :label="statLabel(s)" span="24" v-if="statIsShow(s)">
-                <n-input-number v-model:value="calcStatTempData[s+'A']" />
-              </n-form-item>
-            </template>
-          </n-space>
-          <n-space vertical v-show="currentStep===4">
-            <n-alert :show-icon="false">
-              <template v-for="s in statNames">
-                <template v-if="statIsShow(s)">
-                  {{calcStatResult[s+'T']}}<br>
-                </template>
-              </template>
-            </n-alert>
-            <n-space justify="center">
-              <n-button @click="updateCalcStatResult" type="success">
-                更新
-              </n-button>
-            </n-space>
-          </n-space>
-        </n-space>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="()=>{if(currentStep > 1) currentStep -= 1}" :disabled="currentStep <= 1" round>
-            上一步
-          </n-button>
-          <n-button @click="()=>{if(currentStep < 4) currentStep += 1}" :disabled="currentStep >= 4" round>
-            下一步
-          </n-button>
-          <n-button @click="showCalcStatModal = false">
-            取消
-          </n-button>
-        </n-space>
-      </template>
-    </n-card>
-  </n-modal>
 </template>
 
 <style scoped>
