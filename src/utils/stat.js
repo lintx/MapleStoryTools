@@ -322,6 +322,9 @@ function dupeObj(obj) {
     Object.keys(obj).forEach(k=>{
         if (Array.isArray(obj[k])){
             add[k] = []
+            for (const e of obj[k]){
+                add[k].push(e)
+            }
         }else {
             add[k] = obj[k]
         }
@@ -434,7 +437,7 @@ class Stat {
         if (!jobs.hasOwnProperty(this.data.job)){
             return result
         }
-        if (data===this.data) data = this.addStat(this.data,"",0)
+        data = dupeObj(data)
         //計算buff
         for (const buff of buffs.default){
             if (buff.check){
@@ -505,11 +508,6 @@ class Stat {
     }
     addStat(source,name,val,dupe=true){
         const data = dupe ? dupeObj(source) : source
-        if (dupe){
-            for (const v of source.imdR){
-                data.imdR.push(v)
-            }
-        }
         if (name==="") return data
         switch (name) {
             case "imdR":
