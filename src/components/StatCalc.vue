@@ -41,6 +41,7 @@ watch(
 )
 const statNames = ['hp','str','int','luk','dex']
 const statRNames = statNames.map(n=>n+'R')
+const statDNames = statNames.map(n=>n+'D')
 parseIndex()
 const gis = "xs:24 s:12 m:8 l:6 xl:4 xxl:4"
 // const calcStatsOptions = Object.keys(calcStats).map(k=>{return {label:props[k],value:k}})
@@ -50,7 +51,7 @@ const calcStatsOptions = computed(()=>{
     const option = {label:props[k],value:k}
     if (statNames.indexOf(k)>=0){
       if (statIsShow(k)) result.push(option)
-    }else if (statRNames.indexOf(k)>=0){
+    }else if (statRNames.indexOf(k)>=0 || statDNames.indexOf(k)>=0){
       if (statIsShow(k.substring(0,k.length-1))) result.push(option)
     }else {
       result.push(option)
@@ -583,7 +584,7 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                           <n-input-number min="0" v-model:value="stats.data.pmadD">
                           </n-input-number>
                         </template>
-                        <span>填入{{props.pmad}}%未套用數值，<br>目前只有陰陽師HP轉換等少數{{props.pmad}}不受%加成，一般職業填0即可</span>
+                        <span>填入{{props.pmad}}%未套用數值，<br>目前只有陰陽師HP轉換等少數{{props.pmad}}不套用%加成，一般職業填0即可</span>
                       </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.bdR" :span="gis">
