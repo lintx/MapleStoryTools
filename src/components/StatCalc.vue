@@ -640,24 +640,15 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
               </n-collapse-item>
               <n-collapse-item title="主副屬" name="4">
                 <n-space vertical>
-                  <n-alert :show-icon="false">
-                    每種屬性欄，左側填入ui上現在顯示的基礎數值，中間填入%未套用數值，右側填入%數值
-                  </n-alert>
                   <n-grid item-responsive responsive="screen">
                     <template v-for="s in statNames">
-                      <n-form-item-gi :label="statLabel(s)" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
+                      <n-form-item-gi :label="statLabel(s) + ' 按順序填入基本數值、%數值、%未套用數值'" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
                         <n-input-group>
                           <n-popover trigger="hover">
                             <template #trigger>
                               <n-input-number v-model:value="stats.data[s]" />
                             </template>
-                            <span>填入ui上顯示的{{props[s]}}基礎數值</span>
-                          </n-popover>
-                          <n-popover trigger="hover">
-                            <template #trigger>
-                              <n-input-number v-model:value="stats.data[s+'D']" />
-                            </template>
-                            <span>填入{{props[s]}}%未套用數值</span>
+                            <span>填入ui上顯示的{{props[s]}}基本數值</span>
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
@@ -668,6 +659,12 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                               </n-input-number>
                             </template>
                             <span>填入{{props[s+'R']}}數值</span>
+                          </n-popover>
+                          <n-popover trigger="hover">
+                            <template #trigger>
+                              <n-input-number v-model:value="stats.data[s+'D']" />
+                            </template>
+                            <span>填入{{props[s]}}%未套用數值</span>
                           </n-popover>
                         </n-input-group>
                       </n-form-item-gi>
