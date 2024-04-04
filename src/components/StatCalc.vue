@@ -3,6 +3,7 @@ import * as stat from "@/utils/stat.js";
 import {useRoute, useRouter} from "vue-router";
 import {useDialog, useMessage} from "naive-ui";
 import {Delete} from "@vicons/carbon";
+import {formatFloat} from "../utils/stat.js";
 
 const store = stat.getStore()
 const jobs = stat.getJobs()
@@ -517,6 +518,14 @@ const addBuff = ref({
 const inputPanelCollapseExpanded = ref(['1', '2', '3', '4'])
 const buffsPanelCollapseExpanded = ref(['1', '2'])
 const resultPanelCollapseExpanded = ref(['1', '2'])
+
+const statImdR = computed(()=>{
+  let mdr = 100
+  for (const v of stats.value.data.imdR){
+    mdr *= (100-v)/100
+  }
+  return 100 - mdr
+})
 </script>
 
 <template>
@@ -636,7 +645,7 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                   </n-grid>
                 </n-space>
                 <template #header-extra>
-                  {{stats.calcData().value.imdr}}%
+                  {{stat.formatFloat(statImdR)}}%
                 </template>
               </n-collapse-item>
               <n-collapse-item title="主副屬" name="4">
@@ -764,6 +773,14 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
                         一般：{{numberFormat(stats.calcData().value.nDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害% + 一般傷害%) × (100% + 總傷%)</span>
+                    </n-popover>
+                  </n-gi>
+                  <n-gi :span="gis">
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        無視：{{stat.formatFloat(stats.calcData().value.imdr)}}%
+                      </template>
+                      <span>計算BUFF後的無視防禦率%</span>
                     </n-popover>
                   </n-gi>
                   <n-form-item-gi label-placement="left" label="目標防禦%" :span="gis">

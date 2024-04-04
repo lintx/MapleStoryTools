@@ -411,7 +411,7 @@ export function exportData(d) {
     return arr.join(",")
 }
 
-function formatFloat(val){
+export function formatFloat(val){
     if (typeof val!=="number") return val
     if (!Number.isFinite(val)) return "∞"
     return Math.round(val * 10000) / 10000
