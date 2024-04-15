@@ -425,15 +425,18 @@ class Stat {
         name:"pmad",
         val:1,
     }
-    constructor(data) {
+    constructor(data,name = "") {
         // this.data = ref(data)
         this.data = data
+        this.name = name
         // console.log(this.data)
     }
     showName(){
         return computed(()=>{
             // console.log(this.data)
-            return `${this.data.level}等${this.data.job===null?`無職業`:jobs[this.data.job]["name"]}`
+            let title = `${this.data.level}等${this.data.job===null?`無職業`:jobs[this.data.job]["name"]}`
+            if (this.name!=="") title = `${this.name}(${title})`
+            return title
         })
     }
     calcData(){
@@ -492,7 +495,7 @@ class Stat {
         result.dDamage = Math.floor(result.damage * (1+data.damR/100) * (1+data.pmdR/100))
 
         //練功
-        result.nDamage = Math.floor(result.damage * (1+data.damR/100+data.ndR/100) * (1+data.pmdR/100))
+        result.nDamage = Math.floor(result.damage * (1+data.damR/100+data.ndR/100) * (1+data.pmdR/100)* ( 1.35 + data.cdR / 100))
 
         //b功
         result.bDamage = Math.floor(result.damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
@@ -730,7 +733,8 @@ class Store{
     #save = debounce(()=>{
         const arr = []
         for (const s of this.#stats){
-            arr.push(exportData(s.data))
+            let str = exportData(s.data)
+            arr.push(s.name===""?str:{name:s.name,value:str})
         }
         localStorage.setItem(localKey,JSON.stringify(arr))
     })
@@ -743,9 +747,15 @@ class Store{
             const j = JSON.parse(local)
             if (Array.isArray(j)){
                 for (const i of j){
-                    const d = importData(i)
+                    let str = i
+                    let name = ""
+                    if (typeof i==="object"){
+                        str = i.value
+                        name = i.name
+                    }
+                    const d = importData(str)
                     if (d!==null){
-                        this.#stats.push(new Stat(d))
+                        this.#stats.push(new Stat(d,name))
                     }
                 }
             }

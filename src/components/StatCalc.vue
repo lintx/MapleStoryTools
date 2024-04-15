@@ -30,7 +30,7 @@ function parseIndex(){
   calcSource.value = stats.value.calcSource
   // console.log(stats)
   showName.value = stats.value.showName()
-  stopSw = watch(stats.value.data,()=>{
+  stopSw = watch(()=>[stats.value.data,stats.value.name],()=>{
     store.save()
   })
 }
@@ -536,7 +536,10 @@ const statImdR = computed(()=>{
           <n-form>
             <n-collapse v-model:expanded-names="inputPanelCollapseExpanded">
               <n-collapse-item title="等級、職業" name="1">
-                <n-grid item-responsive responsive="screen">
+                <n-grid item-responsive responsive="screen" x-gap="12">
+                  <n-form-item-gi label="備註名" :span="gis">
+                    <n-input v-model:value="stats.name" />
+                  </n-form-item-gi>
                   <n-form-item-gi :label="props.level" :span="gis">
                     <n-input-number min="0" max="300" v-model:value="stats.data.level" />
                   </n-form-item-gi>
@@ -554,7 +557,7 @@ const statImdR = computed(()=>{
                   <n-alert :show-icon="false">
                     傷害%、最終傷害%、爆擊傷害%、攻擊力/魔法攻擊力、攻擊力%/魔法攻擊力%、BOSS傷害按照遊戲ui中對應數值填寫即可，注意攻擊力/魔法攻擊力需要填寫未經%加成的原始數值，即滑鼠放在攻擊力/魔法攻擊力位置時出現的詳細UI中具體數值相加後的結果。
                   </n-alert>
-                  <n-grid item-responsive responsive="screen">
+                  <n-grid item-responsive responsive="screen" x-gap="12">
                     <n-form-item-gi :label="props.damR" :span="gis">
                       <n-input-number min="0" v-model:value="stats.data.damR">
                         <template #suffix>
@@ -618,7 +621,7 @@ const statImdR = computed(()=>{
                   <n-alert :show-icon="false">
                     無視防禦率可以按照ui顯示的最終無視填寫單條無視，也可以按照滑鼠放在無視上顯示的具體條數對應填寫，但是建議按照具體條數對應填寫，因為按照ui顯示填寫會損失部分小數，按照具體條數填寫更準確。
                   </n-alert>
-                  <n-grid item-responsive responsive="screen">
+                  <n-grid item-responsive responsive="screen" x-gap="12">
                     <n-form-item-gi :span="gis">
                       <n-button attr-type="button" @click="stats.data.imdR.push(0)">
                         增加無視防禦率
@@ -650,7 +653,7 @@ const statImdR = computed(()=>{
               </n-collapse-item>
               <n-collapse-item title="主副屬" name="4">
                 <n-space vertical>
-                  <n-grid item-responsive responsive="screen">
+                  <n-grid item-responsive responsive="screen" x-gap="12">
                     <template v-for="s in statNames">
                       <n-form-item-gi :label="statLabel(s) + ' 按順序填入基本數值、%數值、%未套用數值'" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
                         <n-input-group>
@@ -742,7 +745,7 @@ const statImdR = computed(()=>{
           <n-form>
             <n-collapse v-model:expanded-names="resultPanelCollapseExpanded">
               <n-collapse-item title="素質" name="1">
-                <n-grid item-responsive responsive="screen">
+                <n-grid item-responsive responsive="screen" x-gap="12">
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
@@ -817,7 +820,7 @@ const statImdR = computed(()=>{
                     由於傷害計算部分有大量需要“向下取整”的地方會捨去部分小數，所以有部分數據的換算會有一定誤差，可以調整等效源的數值以多次分析。<br>
                     對於惡復來說，由於計算實際hp時會減半計算，所以如果提升的hp來源為裝備等，需要將等效數值乘以2計算（%數正常計算即可）。
                   </n-alert>
-                  <n-grid item-responsive responsive="screen">
+                  <n-grid item-responsive responsive="screen" x-gap="12">
                     <n-form-item-gi label="等效源" span="24">
                       <n-input-group>
                         <n-input-number v-model:value="calcSource.val">
