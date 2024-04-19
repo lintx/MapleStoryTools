@@ -196,12 +196,12 @@ class Buffs{
             localStorage.setItem(localBuffKey,JSON.stringify(arr))
         })
         this.default = [
-            new Buff(`工會BOSS`,new BuffStat("bdR",30)),
-            new Buff(`工會無視`,new BuffStat("imdR",30)),
-            new Buff(`工會總傷`,new BuffStat("damR",30)),
-            new Buff(`工會爆傷`,new BuffStat("cdR",30)),
-            new Buff(`工會祝福`,new BuffStat("pmad",20)),
-            new Buff(`工會大祝福`,new BuffStat("pmad",30)),
+            new Buff(`公會BOSS`,new BuffStat("bdR",30)),
+            new Buff(`公會無視`,new BuffStat("imdR",30)),
+            new Buff(`公會總傷`,new BuffStat("damR",30)),
+            new Buff(`公會爆傷`,new BuffStat("cdR",30)),
+            new Buff(`公會祝福`,new BuffStat("pmad",20)),
+            new Buff(`公會大祝福`,new BuffStat("pmad",30)),
             new Buff(`MVP`,new BuffStat("pmad",30)),
             new Buff(`破王天氣`,new BuffStat("pmad",30)),
             new Buff(`聯盟之力`,new BuffStat("pmad",30)),
