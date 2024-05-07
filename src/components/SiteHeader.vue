@@ -1,7 +1,7 @@
 <template>
   <n-layout-header bordered class="nav" :style="style">
     <n-text tag="div" class="ui-logo" :depth="1" @click="handleLogoClick">
-      <span>MapleStoryTools</span><small>(v0.10.6)</small>
+      <span>MapleStoryTools</span><small>(v0.10.7)</small>
     </n-text>
     <div
         :style="
@@ -114,6 +114,7 @@ function handleThemeUpdate () {
   } else {
     themeName.value = 'dark'
   }
+  localStorage.setItem("tools_theme",themeName.value)
 }
 const themeLabelMap = computed(() => ({
   dark: '暗色',

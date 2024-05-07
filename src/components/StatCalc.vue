@@ -866,7 +866,7 @@ const statImdR = computed(()=>{
                   </n-grid>
                 </n-space>
               </n-collapse-item>
-              <n-collapse-item title="超級屬性" name="3">
+              <n-collapse-item title="極限屬性" name="3">
                 <n-space vertical>
                   <n-alert :show-icon="false">
                     計算超級屬性時建議先將暴擊率點到100%。<br>
