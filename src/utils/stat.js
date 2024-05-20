@@ -421,10 +421,10 @@ class Stat {
     data
     def = 300
     calcStat = dupeObj(calcStats)
-    calcSource = {
+    calcSources = [{
         name:"pmad",
         val:1,
-    }
+    }]
     constructor(data,name = "") {
         // this.data = ref(data)
         this.data = data
@@ -467,6 +467,7 @@ class Stat {
         for (const v of data.imdR){
             mdr *= (100-v)/100
         }
+        mdr = Math.max(0,mdr)
         result.imdr = 100 - mdr
 
         //計算屬性
@@ -553,32 +554,6 @@ class Stat {
                     data[name].push(val)
                 }
                 break
-            // case "hp":
-            // case "str":
-            // case "int":
-            // case "luk":
-            // case "dex":
-            //     // data[name] = ((source[name] - source[name+"D"]) / (1+source[name+"R"]/100) + val) * (1+source[name+'R']/100) + source[name+'D']
-            //     data[name] += val * (1+source[name+'R']/100)
-            //     break
-            // case "hpD":
-            // case "strD":
-            // case "intD":
-            // case "lukD":
-            // case "dexD":
-            //     let sdn = name.substring(0,name.length-1)
-            //     data[sdn] += val
-            //     data[name] += val
-            //     break
-            // case "hpR":
-            // case "strR":
-            // case "intR":
-            // case "lukR":
-            // case "dexR":
-            //     let sn = name.substring(0,name.length-1)
-            //     data[sn] = ((source[sn] - source[sn+"D"]) / (1+source[name]/100)) * (1+(source[name] + val)/100) + source[sn+'D']
-            //     data[name] += val
-            //     break
             case "atR":
                 for (const san of ['str','int','luk','dex']){
                     // data[san] = ((source[san] - source[san+"D"]) / (1+source[san+"R"]/100)) * (1+(source[san+'R'] + val)/100) + source[san+'D']
@@ -641,11 +616,17 @@ class Stat {
             if (!jobs.hasOwnProperty(this.data.job)){
                 return result
             }
-            if (!result.hasOwnProperty(this.calcSource.name) && this.calcSource.name!=='atR'){
+            let changed = false
+            const data = dupeObj(this.data)
+            for (let source of this.calcSources){
+                if (!result.hasOwnProperty(source.name) && source.name!=='atR') continue
+                changed = true
+                this.addStat(data,source.name,source.val,false)
+            }
+            if (!changed){
                 return result
             }
 
-            const data = this.addStat(this.data,this.calcSource.name,this.calcSource.val,true)
             const buffData = this.buffStat(this.data)
             const beforeResult = this.calcNewData(this.data)
             const afterResult = this.calcNewData(data)
@@ -655,6 +636,10 @@ class Stat {
             result['diff'] = diff
 
             if (afterResult.defBDamage===0) return result
+
+            //計算提升%
+            result.diffR = formatFloat(diff / beforeResult.defBossCriticalDamage * 100)
+
             //計算爆傷比例
             result.cdR = formatFloat((diff / beforeResult.defBDamage * 100))
 

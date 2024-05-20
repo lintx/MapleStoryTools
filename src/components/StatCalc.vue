@@ -17,7 +17,7 @@ const dialog = useDialog();
 
 const buffs = ref(stat.getBuffs())
 let stopSw = null
-let index = ref(null),stats = ref(null),showName = ref(null),calcSource = ref(null)
+let index = ref(null),stats = ref(null),showName = ref(null),calcSources = ref(null)
 function parseIndex(){
   stopSw !== null && stopSw
   index.value = parseInt(route.params.index)
@@ -27,7 +27,7 @@ function parseIndex(){
     index.value = store.stats()[store.stats().length-1]
   }
   stats.value = store.stats()[index.value]
-  calcSource.value = stats.value.calcSource
+  calcSources.value = stats.value.calcSources
   // console.log(stats)
   showName.value = stats.value.showName()
   stopSw = watch(()=>[stats.value.data,stats.value.name],()=>{
@@ -815,37 +815,57 @@ const statImdR = computed(()=>{
                 <n-space vertical>
                   <n-alert :show-icon="false">
                     填寫等效源的數值和類型後，可以看到對應數值的等效源等於多少其他屬性。<br>
-                    帶“最終”字樣的屬性，如最終攻擊、最終str等，均不受%數加成。<br>
                     無視防禦視為增加一條無視而不是直接在當前無視的基礎上增加數值，比如當前無視80%，增加40%無視後，最終無視是88%而不是120%；相應的，等效結果中的無視也是等效源的數值相當於額外增加一條%數的無視的效果；無視的實際效果可能會受不顯示在ui中的無視（如部分5、6轉技能）影響而導致實際提升幅度沒有計算器計算的大，如需計算此部分無視的影響可以在屬性設定ui中增加此部分無視。<br>
                     由於傷害計算部分有大量需要“向下取整”的地方會捨去部分小數，所以有部分數據的換算會有一定誤差，可以調整等效源的數值以多次分析。<br>
                     對於惡復來說，由於計算實際hp時會減半計算，所以如果提升的hp來源為裝備等，需要將等效數值乘以2計算（%數正常計算即可）。
                   </n-alert>
                   <n-grid item-responsive responsive="screen" x-gap="12">
-                    <n-form-item-gi label="等效源" span="24">
-                      <n-input-group>
-                        <n-input-number v-model:value="calcSource.val">
-                          <template v-if="calcSource.name.charAt(calcSource.name.length-1)==='R'" #suffix>
-                            %
-                          </template>
-                        </n-input-number>
-                        <n-select
-                            v-model:value="calcSource.name"
-                            placeholder="請選擇等效源屬"
-                            :options="calcStatsOptions"
-                        />
-                      </n-input-group>
+                    <n-form-item-gi span="24">
+                      <n-button attr-type="button" @click="calcSources.push({name:'pmad',val:0,})">
+                        增加等效源
+                      </n-button>
                     </n-form-item-gi>
+
+                    <template v-for="(source, index) in calcSources">
+                      <n-form-item-gi :show-label="false" span="24">
+                        <n-input-group>
+                          <n-input-number v-model:value="source.val">
+                            <template v-if="source.name.charAt(source.name.length-1)==='R'" #suffix>
+                              %
+                            </template>
+                          </n-input-number>
+                          <n-select
+                              v-model:value="source.name"
+                              placeholder="請選擇等效源屬"
+                              :options="calcStatsOptions"
+                          />
+                          <n-button style="margin-left: 12px" @click="calcSources.splice(index, 1)">
+                            <template #icon>
+                              <n-icon>
+                                <Delete />
+                              </n-icon>
+                            </template>
+                          </n-button>
+                        </n-input-group>
+                      </n-form-item-gi>
+                    </template>
 
                     <n-gi :span="gis">
                       <n-popover trigger="hover">
-                        <template #trigger>防後爆B攻：{{stats.calcSourceResult().value.diff}}</template>
-                        <span>提升{{calcSource.val}}{{calcSource.name.charAt(calcSource.name.length-1)==='R'?'%':''}}{{props[calcSource.name]}}後增加的防後爆B攻</span>
+                        <template #trigger>提升防後爆B攻：{{stats.calcSourceResult().value.diff}}</template>
+                        <span>提升所有等效屬性後增加的防後爆B攻</span>
+                      </n-popover>
+                    </n-gi>
+                    <n-gi :span="gis">
+                      <n-popover trigger="hover">
+                        <template #trigger>提升%：{{stats.calcSourceResult().value.diffR}}%</template>
+                        <span>提升所有等效屬性後增加的防後爆B攻相對於未提升時的%數</span>
                       </n-popover>
                     </n-gi>
                     <n-gi :span="gis">
                       <n-popover trigger="hover">
                         <template #trigger>表攻：{{stats.calcSourceResult().value.dDamage}}</template>
-                        <span>提升{{calcSource.val}}{{calcSource.name.charAt(calcSource.name.length-1)==='R'?'%':''}}{{props[calcSource.name]}}後增加的表攻</span>
+                        <span>提升所有等效屬性後增加的表攻</span>
                       </n-popover>
                     </n-gi>
                     <template  v-for="s in statNames">
