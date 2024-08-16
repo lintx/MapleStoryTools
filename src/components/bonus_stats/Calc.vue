@@ -7,9 +7,10 @@ function formatFloat(val){
 class EquipType{
   static All = 0
   static Normal = 1
-  static Weapons = 2
-  static NormalWeapons = 3
-  static BossWeapons = 4
+  static Boss = 2
+  static Weapons = 3
+  static NormalWeapons = 4
+  static BossWeapons = 5
 }
 class Tier{
   static LevelName = ["T1","T2","T3","T4","T5","T6","T7"];
@@ -176,6 +177,7 @@ const available = computed(() => {
   return stats.filter(item => {
     if (item.type===EquipType.All) return true
     if (item.type===EquipType.Weapons && (input.value.type===EquipType.NormalWeapons || input.value.type===EquipType.BossWeapons)) return true
+    if (item.type===EquipType.Normal && input.value.type===EquipType.Boss) return true
     return input.value.type===item.type
   })
 })
@@ -183,6 +185,7 @@ const resultStat = ref({
   stat:0,
   hp:0,
   attack:0,
+  bonus:0,
 })
 const calcResult = computed(()=>{
   console.log("calcResult")
@@ -193,14 +196,17 @@ const calcResult = computed(()=>{
   const avaHp = []
   const result = {
     "單屬":"T0",
-    "雙屬":"T0",
+    "雙屬1":"T0",
+    "雙屬2":"T0",
     "HP":"T0",
   }
+  const otherResult = []
   for (const val of ava) {
     if (val.name==="武攻"){
       result[val.name] = "T0"
       let bestIndex = -1,minDiff = -1,bestAtt = -1
       for (const [index,v] of val.value(input.value.level,input.value.attack).entries()){
+        if (stat.bonus===0 && index > 2 || stat.bonus===1&&index < 2) continue
         const diff = Math.abs(v-stat.attack)
         if (minDiff===-1 || diff<minDiff){
           bestIndex = index
@@ -217,36 +223,75 @@ const calcResult = computed(()=>{
       }
     }
     if (val.name==="單屬") avaMain.push(...val.value(input.value.level,input.value.attack))
-    if (val.name==="雙屬") avaSub.push(...val.value(input.value.level,input.value.attack))
+    if (val.name==="雙屬") {
+      avaSub.push(...val.value(input.value.level,input.value.attack))
+      avaSub.push(0)
+    }
     if (val.name==="HP") avaHp.push(...val.value(input.value.level,input.value.attack))
   }
 
   if (stat.stat > 0){
-    let bestMIndex = -1,bestSIndex = -1,minDiff = -1,bestMStat = -1,bestSStat = -1
+    let bestMIndex = -1,bestS1Index = -1,bestS2Index = -1,minDiff = -1,bestMStat = -1,bestS1Stat = -1,bestS2Stat
     for (const [mIndex,mV] of avaMain.entries()){
-      for (const [sIndex,sV] of avaSub.entries()){
-        const diff = Math.abs(stat.stat - mV - sV)
-        if (minDiff===-1 || diff<minDiff){
-          bestMIndex = minDiff
-          bestSIndex = sIndex
-          minDiff = diff
-          bestMStat = mV
-          bestSStat = sV
+      if (stat.bonus===0 && mIndex > 2 || stat.bonus===1&&(mIndex < 2 ||  mIndex > 4)) continue
+      for (let [sIndex2,sV2] of avaSub.entries()){
+        if (sV2===0) sIndex2=-1
+        if (stat.bonus===0 && sIndex2 > 2 || stat.bonus===1&&(sIndex2 < 2 ||  sIndex2 > 4)) continue
+        for (let [sIndex1,sV1] of avaSub.entries()){
+          if (sV1===0) sIndex1=-1
+          if (stat.bonus===0 && sIndex1 > 2 || stat.bonus===1&&(sIndex1 < 2 ||  sIndex1 > 4)) continue
+          const diff = Math.abs(stat.stat - mV - sV1 - sV2)
+          if (diff===0){
+            const tmp = {}
+            if (mIndex>=0){
+              tmp["單屬"] = Tier.LevelName[mIndex]
+            }
+            if (sIndex1>=0){
+              tmp["雙屬1"] = Tier.LevelName[sIndex1]
+            }
+            if (sIndex2>=0){
+              tmp["雙屬2"] = Tier.LevelName[sIndex2]
+            }
+            let find = false
+            for (const o of otherResult){
+              if (o["雙屬1"]===tmp["雙屬2"] && o["雙屬2"]===tmp["雙屬1"]){
+                find = true
+                break
+              }
+            }
+            if (!find) otherResult.push(tmp)
+          }
+          if (minDiff===-1 || diff<minDiff || (diff===0 && (sV1 || sV2===0))){
+            bestMIndex = mIndex
+            bestS1Index = sIndex1
+            bestS2Index = sIndex2
+            minDiff = diff
+            bestMStat = mV
+            bestS1Stat = sV1
+            bestS2Stat = sV2
+          }
         }
       }
     }
     if (bestMIndex >= 0){
-      if (bestMStat+bestSStat===stat.stat){
+      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
         result["單屬"] = Tier.LevelName[bestMIndex]
       }else {
         result["單屬"] = `${Tier.LevelName[bestMIndex]}(${bestMStat})`
       }
     }
-    if (bestSIndex >= 0){
-      if (bestMStat+bestSStat===stat.stat){
-        result["雙屬"] = Tier.LevelName[bestSIndex]
+    if (bestS1Index >= 0){
+      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
+        result["雙屬1"] = Tier.LevelName[bestS1Index]
       }else {
-        result["雙屬"] = `${Tier.LevelName[bestSIndex]}(${bestSStat})`
+        result["雙屬1"] = `${Tier.LevelName[bestS1Index]}(${bestS1Stat})`
+      }
+    }
+    if (bestS2Index >= 0){
+      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
+        result["雙屬2"] = Tier.LevelName[bestS2Index]
+      }else {
+        result["雙屬2"] = `${Tier.LevelName[bestS2Index]}(${bestS2Stat})`
       }
     }
   }
@@ -274,7 +319,13 @@ const calcResult = computed(()=>{
       delete result[key]
     }
   }
-  return result
+  for (let i=otherResult.length-1;i>=0;i--){
+    const o = otherResult[i]
+    if (o["單屬"]===result["單屬"] && (o["雙屬1"]===result["雙屬1"] && o["雙屬2"]===result["雙屬2"] || o["雙屬1"]===result["雙屬2"] && o["雙屬2"]===result["雙屬1"])){
+      otherResult.splice(i,1)
+    }
+  }
+  return {result,otherResult}
 })
 </script>
 
@@ -285,11 +336,14 @@ const calcResult = computed(()=>{
         <n-form-item label="裝備等級" path="inputValue">
           <n-input-number v-model:value="input.level" placeholder="裝備等級" />
         </n-form-item>
-        <n-form-item label="裝備類型" feedback="常見的BOSS武器主要有：深淵、航海師、神秘、創世，神之子創世屬於普通武器" path="radioGroupValue">
+        <n-form-item label="裝備類型" feedback="常見的BOSS裝備主要有：深淵、航海師、神秘、永恆、創世，神之子創世屬於普通武器" path="radioGroupValue">
           <n-radio-group v-model:value="input.type" name="type-radio-group">
             <n-space>
               <n-radio :value="EquipType.Normal">
                 普通裝備
+              </n-radio>
+              <n-radio :value="EquipType.Boss">
+                BOSS防、飾
               </n-radio>
               <n-radio :value="EquipType.NormalWeapons">
                 普通武器
@@ -323,6 +377,18 @@ const calcResult = computed(()=>{
     </n-card>
     <n-card :style="{maxWidth: '640px',margin: '0 auto',}" title="星火素質">
       <n-form label-placement="left" label-width="auto" require-mark-placement="right-hanging">
+        <n-form-item label="星火類型" path="radioGroupValue">
+          <n-radio-group v-model:value="resultStat.bonus" name="bonus-radio-group">
+            <n-space>
+              <n-radio :value="1">
+                覺醒火
+              </n-radio>
+              <n-radio :value="0">
+                普通火
+              </n-radio>
+            </n-space>
+          </n-radio-group>
+        </n-form-item>
         <n-form-item label="主屬" path="inputValue">
           <n-input-number v-model:value="resultStat.stat" placeholder="主屬" />
         </n-form-item>
@@ -336,20 +402,39 @@ const calcResult = computed(()=>{
     </n-card>
 
     <n-card :style="{maxWidth: '640px',margin: '0 auto',}" title="素質回算">
-      <n-table striped size="small">
-        <thead>
-        <tr>
-          <th>加權</th>
-          <th>等級</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="(v,k) in calcResult">
-          <td>{{k}}</td>
-          <td>{{v}}</td>
-        </tr>
-        </tbody>
-      </n-table>
+      <n-space vertical>
+        <n-table striped size="small">
+          <thead>
+          <tr>
+            <th>加權</th>
+            <th>等級</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="(v,k) in calcResult.result">
+            <td>{{k}}</td>
+            <td>{{v}}</td>
+          </tr>
+          </tbody>
+        </n-table>
+        <template v-if="calcResult.otherResult.length>0">
+          <n-thing>其它可能的屬性組合</n-thing>
+          <n-table striped size="small" v-for="r in calcResult.otherResult">
+            <thead>
+            <tr>
+              <th>加權</th>
+              <th>等級</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="(v,k) in r">
+              <td>{{k}}</td>
+              <td>{{v}}</td>
+            </tr>
+            </tbody>
+          </n-table>
+        </template>
+      </n-space>
     </n-card>
   </n-space>
 </template>
