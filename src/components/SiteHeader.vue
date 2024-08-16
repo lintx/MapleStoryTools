@@ -1,7 +1,7 @@
 <template>
   <n-layout-header bordered class="nav" :style="style">
     <n-text tag="div" class="ui-logo" :depth="1" @click="handleLogoClick">
-      <span>MapleStoryTools</span><small>(v0.11.1)</small>
+      <span>MapleStoryTools</span><small>(v0.11.2)</small>
     </n-text>
     <div
         :style="

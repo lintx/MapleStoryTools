@@ -222,7 +222,10 @@ const calcResult = computed(()=>{
         }
       }
     }
-    if (val.name==="單屬") avaMain.push(...val.value(input.value.level,input.value.attack))
+    if (val.name==="單屬") {
+      avaMain.push(...val.value(input.value.level,input.value.attack))
+      avaMain.push(0)
+    }
     if (val.name==="雙屬") {
       avaSub.push(...val.value(input.value.level,input.value.attack))
       avaSub.push(0)
@@ -232,7 +235,8 @@ const calcResult = computed(()=>{
 
   if (stat.stat > 0){
     let bestMIndex = -1,bestS1Index = -1,bestS2Index = -1,minDiff = -1,bestMStat = -1,bestS1Stat = -1,bestS2Stat
-    for (const [mIndex,mV] of avaMain.entries()){
+    for (let [mIndex,mV] of avaMain.entries()){
+      if (mV===0) mIndex=-1
       if (stat.bonus===0 && mIndex > 2 || stat.bonus===1&&(mIndex < 2 ||  mIndex > 4)) continue
       for (let [sIndex2,sV2] of avaSub.entries()){
         if (sV2===0) sIndex2=-1
