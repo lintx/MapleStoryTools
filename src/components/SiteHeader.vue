@@ -1,7 +1,7 @@
 <template>
   <n-layout-header bordered class="nav" :style="style">
     <n-text tag="div" class="ui-logo" :depth="1" @click="handleLogoClick">
-      <span>MapleStoryTools</span><small>(v0.10.7)</small>
+      <span>MapleStoryTools</span><small>(v0.11.0)</small>
     </n-text>
     <div
         :style="
@@ -100,9 +100,14 @@ const menuOptions = computed(() => {
     },
     {
       key: 'stat-calc',
-      label: '屬性計算器',
+      label: '屬性計算機',
       path: '/stat-calc'
-    }
+    },
+    {
+      key: 'bonus-calc',
+      label: '星火計算機',
+      path: '/bonus-calc'
+    },
   ]
 })
 

@@ -4,9 +4,15 @@ import {Calculation} from "@vicons/carbon";
 const tools = [
   {
     icon:Calculation,
-    title:'屬性計算器',
+    title:'屬性計算機',
     path:'/stat-calc',
     desc:'根據角色屬性計算收益等',
+  },
+  {
+    icon:Calculation,
+    title: '星火計算機',
+    path:'/bonus-calc',
+    desc: '計算裝備星火素質',
   }
 ]
 </script>

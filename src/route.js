@@ -2,6 +2,7 @@ import {createRouter,createWebHashHistory} from 'vue-router'
 import Index from '@/components/Index.vue'
 import StatCalcIndex from '@/components/StatCalcIndex.vue'
 import StatCalc from '@/components/StatCalc.vue'
+import bonusCalc from '@/components/bonus_stats/Calc.vue'
 
 const index = Index
 const calcIndex = StatCalcIndex
@@ -12,6 +13,7 @@ const routes = [
     { path: '/stat-calc', component: calcIndex },
     { path: '/stat-calc/import/:importData', component: calcIndex },
     { path: '/stat-calc/:index', component: calc },
+    { path: '/bonus-calc', component: bonusCalc },
 ]
 
 const router = createRouter({
