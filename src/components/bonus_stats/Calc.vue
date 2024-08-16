@@ -173,7 +173,6 @@ const input = ref({
   attack:0,
 })
 const available = computed(() => {
-  console.log("available")
   return stats.filter(item => {
     if (item.type===EquipType.All) return true
     if (item.type===EquipType.Weapons && (input.value.type===EquipType.NormalWeapons || input.value.type===EquipType.BossWeapons)) return true
@@ -188,7 +187,6 @@ const resultStat = ref({
   bonus:0,
 })
 const calcResult = computed(()=>{
-  console.log("calcResult")
   const ava = available.value
   const stat = resultStat.value
   const avaMain = []
@@ -198,6 +196,7 @@ const calcResult = computed(()=>{
     "單屬":"T0",
     "雙屬1":"T0",
     "雙屬2":"T0",
+    "雙屬3":"T0",
     "HP":"T0",
   }
   const otherResult = []
@@ -234,68 +233,99 @@ const calcResult = computed(()=>{
   }
 
   if (stat.stat > 0){
-    let bestMIndex = -1,bestS1Index = -1,bestS2Index = -1,minDiff = -1,bestMStat = -1,bestS1Stat = -1,bestS2Stat
+    let bestTmp = []
+    let bestMIndex = -1,bestS1Index = -1,bestS2Index = -1,bestS3Index = -1,minDiff = -1,bestMStat = -1,bestS1Stat = -1,bestS2Stat = -1,bestS3Stat = -1
     for (let [mIndex,mV] of avaMain.entries()){
       if (mV===0) mIndex=-1
       if (stat.bonus===0 && mIndex > 2 || stat.bonus===1&&(mIndex < 2 ||  mIndex > 4)) continue
-      for (let [sIndex2,sV2] of avaSub.entries()){
-        if (sV2===0) sIndex2=-1
-        if (stat.bonus===0 && sIndex2 > 2 || stat.bonus===1&&(sIndex2 < 2 ||  sIndex2 > 4)) continue
-        for (let [sIndex1,sV1] of avaSub.entries()){
-          if (sV1===0) sIndex1=-1
-          if (stat.bonus===0 && sIndex1 > 2 || stat.bonus===1&&(sIndex1 < 2 ||  sIndex1 > 4)) continue
-          const diff = Math.abs(stat.stat - mV - sV1 - sV2)
-          if (diff===0){
-            const tmp = {}
-            if (mIndex>=0){
-              tmp["單屬"] = Tier.LevelName[mIndex]
-            }
-            if (sIndex1>=0){
-              tmp["雙屬1"] = Tier.LevelName[sIndex1]
-            }
-            if (sIndex2>=0){
-              tmp["雙屬2"] = Tier.LevelName[sIndex2]
-            }
-            let find = false
-            for (const o of otherResult){
-              if (o["雙屬1"]===tmp["雙屬2"] && o["雙屬2"]===tmp["雙屬1"]){
-                find = true
-                break
+
+      for (let [sIndex3,sV3] of avaSub.entries()){
+        if (sV3===0) sIndex3=-1
+        if (stat.bonus===0 && sIndex3 > 2 || stat.bonus===1&&(sIndex3 < 2 ||  sIndex3 > 4)) continue
+
+        for (let [sIndex2,sV2] of avaSub.entries()){
+          if (sV2===0) sIndex2=-1
+          if (stat.bonus===0 && sIndex2 > 2 || stat.bonus===1&&(sIndex2 < 2 ||  sIndex2 > 4)) continue
+
+          for (let [sIndex1,sV1] of avaSub.entries()){
+            if (sV1===0) sIndex1=-1
+            if (stat.bonus===0 && sIndex1 > 2 || stat.bonus===1&&(sIndex1 < 2 ||  sIndex1 > 4)) continue
+
+            const diff = Math.abs(stat.stat - mV - sV1 - sV2 - sV3)
+            if (diff===0){
+              // let tmp = [mIndex>=0?mIndex:-1,[sIndex1,sIndex2,sIndex3].filter(a=>a>=0).sort((a,b)=>b-a)]
+              let tmp = [mIndex>=0?mIndex:-1,[sIndex1,sIndex2,sIndex3].sort((a,b)=>b-a)]
+              if (!bestTmp.some(v=>`${v[0]},${v[1].join(',')}`===`${tmp[0]},${tmp[1].join(',')}`)){
+                bestTmp.push(tmp)
               }
             }
-            if (!find) otherResult.push(tmp)
-          }
-          if (minDiff===-1 || diff<minDiff || (diff===0 && (sV1 || sV2===0))){
-            bestMIndex = mIndex
-            bestS1Index = sIndex1
-            bestS2Index = sIndex2
-            minDiff = diff
-            bestMStat = mV
-            bestS1Stat = sV1
-            bestS2Stat = sV2
+            if (minDiff===-1 || diff<minDiff){
+              bestMIndex = mIndex
+              bestS1Index = sIndex1
+              bestS2Index = sIndex2
+              bestS3Index = sIndex3
+              minDiff = diff
+              bestMStat = mV
+              bestS1Stat = sV1
+              bestS2Stat = sV2
+              bestS3Stat = sV3
+            }
           }
         }
       }
     }
-    if (bestMIndex >= 0){
-      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
-        result["單屬"] = Tier.LevelName[bestMIndex]
-      }else {
+
+    if (bestTmp.length===0){
+      if (bestMIndex >= 0){
         result["單屬"] = `${Tier.LevelName[bestMIndex]}(${bestMStat})`
       }
-    }
-    if (bestS1Index >= 0){
-      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
-        result["雙屬1"] = Tier.LevelName[bestS1Index]
-      }else {
+      if (bestS1Index >= 0){
         result["雙屬1"] = `${Tier.LevelName[bestS1Index]}(${bestS1Stat})`
       }
-    }
-    if (bestS2Index >= 0){
-      if (bestMStat+bestS1Stat+bestS2Stat===stat.stat){
-        result["雙屬2"] = Tier.LevelName[bestS2Index]
-      }else {
+      if (bestS2Index >= 0){
         result["雙屬2"] = `${Tier.LevelName[bestS2Index]}(${bestS2Stat})`
+      }
+      if (bestS3Index >= 0){
+        result["雙屬3"] = `${Tier.LevelName[bestS3Index]}(${bestS3Stat})`
+      }
+    }else {
+      bestTmp = bestTmp.sort((a,b)=> {
+        if (a[0]!==b[0]) return b[0]-a[0]
+        for (let i=0;i<a[1].length;i++){
+          if (a[1][i] !== b[1][i]) return b[1][i] - a[1][i]
+        }
+        return 0
+      })
+      let tmp = bestTmp.splice(0,1)[0]
+      if (tmp[0] >= 0){
+        result["單屬"] = Tier.LevelName[tmp[0]]
+      }
+      if (tmp[1][0] >= 0){
+        result["雙屬1"] = Tier.LevelName[tmp[1][0]]
+      }
+      if (tmp[1][1] >= 0){
+        result["雙屬2"] = Tier.LevelName[tmp[1][1]]
+      }
+      if (tmp[1][2] >= 0){
+        result["雙屬3"] = Tier.LevelName[tmp[1][2]]
+      }
+      if (bestTmp.length > 0){
+        for (const [m,[s1,s2,s3]] of bestTmp){
+          const o = {}
+          if (m >= 0){
+            o["單屬"] = Tier.LevelName[m]
+          }
+          if (s1 >= 0){
+            o["雙屬1"] = Tier.LevelName[s1]
+          }
+          if (s2 >= 0){
+            o["雙屬2"] = Tier.LevelName[s2]
+          }
+          if (s3 >= 0){
+            o["雙屬3"] = Tier.LevelName[s3]
+          }
+          otherResult.push(o)
+        }
       }
     }
   }
@@ -321,12 +351,6 @@ const calcResult = computed(()=>{
   for (const key in result){
     if (result[key]==="T0"){
       delete result[key]
-    }
-  }
-  for (let i=otherResult.length-1;i>=0;i--){
-    const o = otherResult[i]
-    if (o["單屬"]===result["單屬"] && (o["雙屬1"]===result["雙屬1"] && o["雙屬2"]===result["雙屬2"] || o["雙屬1"]===result["雙屬2"] && o["雙屬2"]===result["雙屬1"])){
-      otherResult.splice(i,1)
     }
   }
   return {result,otherResult}
