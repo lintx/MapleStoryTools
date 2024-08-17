@@ -4,6 +4,39 @@ function formatFloat(val){
   if (!Number.isFinite(val)) return "∞"
   return (val * 100) + '%'
 }
+
+class BonusItem{
+  static TypeNormal = 0
+  static TypeWakeup = 1
+  t1 = "-"
+  t2 = "-"
+  t3 = "-"
+  t4 = "-"
+  t5 = "-"
+  name = ""
+  type = BonusItem.TypeNormal
+  constructor(name,type,t1,t2,t3,t4,t5) {
+    this.name = name
+    this.type = type
+    this.t1 = t1
+    this.t2 = t2
+    this.t3 = t3
+    this.t4 = t4
+    this.t5 = t5
+  }
+
+  values(){
+    return [this.t1,this.t2,this.t3,this.t4,this.t5]
+  }
+}
+
+const BonusItems = [
+    new BonusItem("110～150級輪迴星火",BonusItem.TypeNormal,"60%","35%","5%","",""),
+    new BonusItem("強力的輪迴星火",BonusItem.TypeNormal,"50%","30%","20%","",""),
+    new BonusItem("永遠的輪迴星火",BonusItem.TypeNormal,"44.44%","33.33%","22.22%","",""),
+    new BonusItem("覺醒的輪迴星火",BonusItem.TypeWakeup,"97.36%","1.50%","0.58%","0.33%","0.23%"),
+]
+
 class EquipType{
   static All = 0
   static Normal = 1
@@ -171,6 +204,7 @@ const input = ref({
   level:200,
   type:EquipType.Normal,
   attack:0,
+  bonus:0,
 })
 const available = computed(() => {
   return stats.filter(item => {
@@ -180,15 +214,56 @@ const available = computed(() => {
     return input.value.type===item.type
   })
 })
+const startBonusLevel = computed(() => {
+  let start = 0
+  const et = input.value.type
+  const bi = BonusItems[input.value.bonus]
+  if (bi.type===BonusItem.TypeWakeup) {
+    if (et===EquipType.Boss || et===EquipType.BossWeapons) {
+      start = 2
+    }
+  }
+  return start
+})
+const endBonusLevel = computed(() => {
+  let end = 2
+  const et = input.value.type
+  const bi = BonusItems[input.value.bonus]
+  if (bi.type===BonusItem.TypeWakeup) {
+    end = 4
+    if (et===EquipType.Boss || et===EquipType.BossWeapons) {
+      end = 6
+    }
+  }
+  return end
+})
+const probability = computed(() => {
+  const bi = BonusItems[input.value.bonus]
+  const et = input.value.type
+  const startLevel = startBonusLevel.value
+  const endLevel = endBonusLevel.value
+  const result = []
+  for (let i=0;i<startLevel;i++){
+    result.push("")
+  }
+  result.push(...bi.values())
+  if (result.length<7){
+    for (let i=0,l=result.length;i<7-l;i++){
+      result.push("")
+    }
+  }
+  return result
+})
 const resultStat = ref({
   stat:0,
   hp:0,
   attack:0,
-  bonus:0,
 })
 const calcResult = computed(()=>{
   const ava = available.value
   const stat = resultStat.value
+  const startLevel = startBonusLevel.value
+  const endLevel = endBonusLevel.value
   const avaMain = []
   const avaSub = []
   const avaHp = []
@@ -205,7 +280,7 @@ const calcResult = computed(()=>{
       result[val.name] = "T0"
       let bestIndex = -1,minDiff = -1,bestAtt = -1
       for (const [index,v] of val.value(input.value.level,input.value.attack).entries()){
-        if (stat.bonus===0 && index > 2 || stat.bonus===1&&index < 2) continue
+        if (index > endLevel || index < startLevel) continue
         const diff = Math.abs(v-stat.attack)
         if (minDiff===-1 || diff<minDiff){
           bestIndex = index
@@ -237,19 +312,19 @@ const calcResult = computed(()=>{
     let bestMIndex = -1,bestS1Index = -1,bestS2Index = -1,bestS3Index = -1,minDiff = -1,bestMStat = -1,bestS1Stat = -1,bestS2Stat = -1,bestS3Stat = -1
     for (let [mIndex,mV] of avaMain.entries()){
       if (mV===0) mIndex=-1
-      if (stat.bonus===0 && mIndex > 2 || stat.bonus===1&&(mIndex < 2 ||  mIndex > 4)) continue
+      if (mIndex > endLevel || (mIndex !== -1 && mIndex < startLevel)) continue
 
       for (let [sIndex3,sV3] of avaSub.entries()){
         if (sV3===0) sIndex3=-1
-        if (stat.bonus===0 && sIndex3 > 2 || stat.bonus===1&&(sIndex3 < 2 ||  sIndex3 > 4)) continue
+        if (sIndex3 > endLevel || (sIndex3 !== -1 && sIndex3 < startLevel)) continue
 
         for (let [sIndex2,sV2] of avaSub.entries()){
           if (sV2===0) sIndex2=-1
-          if (stat.bonus===0 && sIndex2 > 2 || stat.bonus===1&&(sIndex2 < 2 ||  sIndex2 > 4)) continue
+          if (sIndex2 > endLevel || (sIndex2 !== -1 && sIndex2 < startLevel)) continue
 
           for (let [sIndex1,sV1] of avaSub.entries()){
             if (sV1===0) sIndex1=-1
-            if (stat.bonus===0 && sIndex1 > 2 || stat.bonus===1&&(sIndex1 < 2 ||  sIndex1 > 4)) continue
+            if (sIndex1 > endLevel || (sIndex1 !== -1 && sIndex1 < startLevel)) continue
 
             const diff = Math.abs(stat.stat - mV - sV1 - sV2 - sV3)
             if (diff===0){
@@ -259,7 +334,7 @@ const calcResult = computed(()=>{
                 bestTmp.push(tmp)
               }
             }
-            if (minDiff===-1 || diff<minDiff){
+            if ((mIndex >= 0 || sIndex1 >= 0 || sIndex2 >= 0 || sIndex3 >= 0) && (minDiff===-1 || diff<minDiff)){
               bestMIndex = mIndex
               bestS1Index = sIndex1
               bestS2Index = sIndex2
@@ -382,6 +457,13 @@ const calcResult = computed(()=>{
             </n-space>
           </n-radio-group>
         </n-form-item>
+        <n-form-item label="星火類型" path="radioGroupValue">
+          <n-radio-group v-model:value="input.bonus" name="bonus-radio-group">
+            <n-space>
+              <n-radio v-for="(b,index) in BonusItems" :value="index">{{b.name}}</n-radio>
+            </n-space>
+          </n-radio-group>
+        </n-form-item>
         <n-form-item v-show="input.type===EquipType.NormalWeapons || input.type===EquipType.BossWeapons" label="武器攻擊" feedback="武器原始攻擊力，魔攻職業填入魔攻" path="inputValue">
           <n-input-number v-model:value="input.attack" placeholder="武器攻擊" />
         </n-form-item>
@@ -396,6 +478,10 @@ const calcResult = computed(()=>{
         </tr>
         </thead>
         <tbody>
+        <tr>
+          <td>幾率</td>
+          <td v-for="val in probability">{{val}}</td>
+        </tr>
         <tr v-for="stat in available">
           <td>{{stat.name}}</td>
           <td v-for="val in stat.value(input.level,input.attack)">{{val}}</td>
@@ -405,18 +491,6 @@ const calcResult = computed(()=>{
     </n-card>
     <n-card :style="{maxWidth: '640px',margin: '0 auto',}" title="星火素質">
       <n-form label-placement="left" label-width="auto" require-mark-placement="right-hanging">
-        <n-form-item label="星火類型" path="radioGroupValue">
-          <n-radio-group v-model:value="resultStat.bonus" name="bonus-radio-group">
-            <n-space>
-              <n-radio :value="1">
-                覺醒火
-              </n-radio>
-              <n-radio :value="0">
-                普通火
-              </n-radio>
-            </n-space>
-          </n-radio-group>
-        </n-form-item>
         <n-form-item label="主屬" path="inputValue">
           <n-input-number v-model:value="resultStat.stat" placeholder="主屬" />
         </n-form-item>
