@@ -28,15 +28,16 @@ const currentStatName = computed(()=>{
 const mapleBuffStat = computed(() => {
   let baseAddStat = 0
   let ps = ""
-  switch (currentStat.value.job) {
+  switch (currentStat.value.data.job) {
     case "3122":
       break
     default:
-      ps = jobs[currentStat.value.job].ps
+      ps = jobs[currentStat.value.data.job].ps
       const psCount = ps.length
-      const allStats = (currentStat.value.level-1)*5+25-((4-psCount)*4)+10
+      const allStats = (currentStat.value.data.level-1)*5+25-((4-psCount)*4)+10
       baseAddStat = allStats / psCount
   }
+  console.log(baseAddStat)
 
   return {
     ps,
