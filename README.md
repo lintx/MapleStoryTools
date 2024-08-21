@@ -1,29 +1,11 @@
 # MapleStoryTools
 
-This template should help get you started developing with Vue 3 in Vite.
+基於Vue3構建的MapleStory工具集，包含屬性計算機、星火計算機等一系列工具
 
-## Recommended IDE Setup
+## 屬性計算機
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+web屬性計算機、極限屬性、HEXA屬性計算
 
-## Customize configuration
+## 星火計算機
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
-
-## Project Setup
-
-```sh
-pnpm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-pnpm dev
-```
-
-### Compile and Minify for Production
-
-```sh
-pnpm build
-```
+填入裝備等級等數據後，計算機可以給出星火可用的素質，填入當前星火的素質後，計算機可以回算星火等級
