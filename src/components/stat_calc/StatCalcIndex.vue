@@ -1,24 +1,23 @@
 <script setup>
-import * as stat from "@/utils/stat.js";
 import {useRoute, useRouter} from "vue-router";
 import {useMessage} from "naive-ui";
+import {getStore, Stat} from "./store";
 
-const store = stat.getStore()
+const store = getStore()
 const route = useRoute()
 const router = useRouter()
-const stats = ref(store.stats())
+const stats = store.stats
 const message = useMessage()
 const dialog = useDialog();
 
 function parseImport(){
   if (route.params.importData !== undefined){
-    const d = stat.importData(route.params.importData)
+    const d = Stat.import("",route.params.importData)
     if (d===null){
-      message.error("無效的檔案鏈接");
+      message.error("無效的檔案連結");
     }else {
-      const stat = store.newStat(d)
-      message.success("成功導入檔案：" + stat.showName().value);
-      stats.value.push(stat)
+      store.stats.push(d)
+      message.success("成功導入檔案：" + d.showName);
       store.save()
     }
     router.push(`/stat-calc`)
@@ -41,13 +40,13 @@ function open(index){
 }
 const shareLink = computed(()=>{
   return function (stats) {
-    return `${location.href}/import/${stat.exportData(stats.data)}`
+    return `${location.href}/import/${stats.exportData}`
   }
 })
 
 function showLink(item) {
   dialog.info({
-    title:'檔案連接',
+    title:'檔案連結',
     content:shareLink.value(item),
     positiveText:'好',
   })
@@ -62,7 +61,7 @@ function showLink(item) {
     <n-list bordered>
       <n-list-item v-for="(item,index) in stats">
         <n-space justify="space-between">
-          <n-button text size="large" @click="open(index)">{{item.showName().value}}</n-button>
+          <n-button text size="large" @click="open(index)">{{item.showName}}</n-button>
           <n-space justify="end">
             <n-button @click="showLink(item)" text>分享</n-button>
             <n-popconfirm

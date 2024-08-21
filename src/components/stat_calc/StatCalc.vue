@@ -1,67 +1,354 @@
 <script setup>
-import * as stat from "@/utils/stat.js";
 import {useRoute, useRouter} from "vue-router";
-import {useDialog, useMessage} from "naive-ui";
+import {useMessage} from "naive-ui";
 import {Delete} from "@vicons/carbon";
-import {formatFloat} from "../utils/stat.js";
+import {watch} from "vue"
+import {dupeObj, formatFloat, getCalcStats, getJobs, getPropNames, getStore} from "./store.js"
+import {debounce} from "@/utils/debounce.js";
 
-const store = stat.getStore()
-const jobs = stat.getJobs()
-const jobGroups = stat.getJobGroups()
-const props = stat.getPropNames()
-const calcStats = stat.getCalcStats()
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
-const dialog = useDialog();
 
-const buffs = ref(stat.getBuffs())
-let stopSw = null
-let index = ref(null),stats = ref(null),showName = ref(null),calcSources = ref(null)
-function parseIndex(){
-  stopSw !== null && stopSw
-  index.value = parseInt(route.params.index)
-  if (isNaN(index.value) || index.value < 0 || index.value >= store.stats().length){
-    message.error("無效的檔案");
-    router.push(`/stat-calc`)
-    index.value = store.stats()[store.stats().length-1]
+const {jobGroups,jobs} = getJobs()
+const props = getPropNames()
+const calcStats = getCalcStats()
+const allStats = getStore().stats
+const statsIndex = ref(-1)
+const currentStat = computed(() => {
+  if (statsIndex.value < 0 || statsIndex.value >= allStats.length){
+    return null
   }
-  stats.value = store.stats()[index.value]
-  calcSources.value = stats.value.calcSources
-  // console.log(stats)
-  showName.value = stats.value.showName()
-  stopSw = watch(()=>[stats.value.data,stats.value.name],()=>{
-    store.save()
-  })
+  return allStats[statsIndex.value]
+})
+const currentStatName = computed(()=>{
+  if (currentStat.value===null) return ""
+  return currentStat.value.showName
+})
+const mapleBuffStat = computed(() => {
+  let baseAddStat = 0
+  let ps = ""
+  switch (currentStat.value.job) {
+    case "3122":
+      break
+    default:
+      ps = jobs[currentStat.value.job].ps
+      const psCount = ps.length
+      const allStats = (currentStat.value.level-1)*5+25-((4-psCount)*4)+10
+      baseAddStat = allStats / psCount
+  }
+
+  return {
+    ps,
+    maple30:Math.floor(baseAddStat * 0.15),
+    maple31:Math.floor(baseAddStat * 0.16),
+    maple30Super:Math.floor(baseAddStat * 0.15 * 4),
+    maple31Super:Math.floor(baseAddStat * 0.16 * 4),
+  }
+})
+
+function handleBack() {
+  router.push(`/stat-calc`)
 }
 watch(
-    ()=>route.params,
-    (toParams, previousParams) => {
-      parseIndex()
-    }
+    ()=>route.params.index,
+    () => {
+      statsIndex.value = parseInt(route.params.index)
+      if (currentStat.value===null){
+        message.error("無效的檔案");
+        handleBack()
+      }
+    },
+    {immediate:true}
 )
-const statNames = ['hp','str','int','luk','dex']
-const statRNames = statNames.map(n=>n+'R')
-const statDNames = statNames.map(n=>n+'D')
-parseIndex()
+
+function calcSourceData(data){
+  data = dupeObj(data)
+  const result = {
+    st:0,   //加權後屬性
+    wm:0,   //武器係數
+    imdr:0, //無視
+    damage:0,   //真攻
+    bDamage:0,  //b功
+    nDamage:0,  //b功
+    dDamage:0,  //表功
+    remainingDef:0, //有效傷害比
+    defBDamage:0,   //有效b功
+    defBossCriticalDamage:0,    //有效爆功
+  }
+  if (!jobs.hasOwnProperty(data.job)){
+    return result
+  }
+  applyBuff(data)
+
+  //計算無視
+  let mdr = 100
+  for (const v of data.imdR){
+    mdr *= (100-v)/100
+  }
+  mdr = Math.max(0,mdr)
+  result.imdr = 100 - mdr
+
+  //計算屬性
+  switch (data.job) {
+    case "3122":
+      let chp = 545 + 90 * data.level
+      result.st = Math.floor(chp / 3.5) + 0.8 * Math.floor((data.hp * (1+data['hpR']/100) + data.hpD - chp) / 3.5) + data.str * (1+data['strR']/100) + data.strD
+      break
+    case "3612":
+      result.st = (data.str * (1+data['strR']/100) + data.strD + data.luk * (1+data['lukR']/100) + data.lukD + data.dex + (1+data['dexR']/100) + data.dexD) * 3
+      break
+    default:
+      for (const s of jobs[data.job].ps){
+        result.st += (data[s] * (1+data[s+'R']/100) + data[s+'D']) * 4
+      }
+      for (const s of jobs[data.job].ss){
+        result.st += data[s] * (1+data[s+'R']/100) + data[s+'D']
+      }
+  }
+
+  //計算真功
+  result.wm = jobs[data.job].wm
+  result.damage = Math.floor(result.wm * result.st * Math.floor(data.pmad * (1+data.pmadR/100) + data.pmadD) / 100)
+
+  //表功
+  result.dDamage = Math.floor(result.damage * (1+data.damR/100) * (1+data.pmdR/100))
+
+  //練功
+  result.nDamage = Math.floor(result.damage * (1+data.damR/100+data.ndR/100) * (1+data.pmdR/100)* ( 1.35 + data.cdR / 100))
+
+  //b功
+  result.bDamage = Math.floor(result.damage * (1+data.damR/100+data.bdR/100) * (1+data.pmdR/100))
+
+  //防禦後有效傷害部分
+  result.remainingDef = 1 - ( 1 - result.imdr/100) * def.value/100
+
+  //計算防後B功
+  result.defBDamage = Math.max(Math.floor(result.bDamage * result.remainingDef),0)
+
+  //計算防後暴B功
+  result.defBossCriticalDamage = Math.floor(result.defBDamage * ( 1.35 + data.cdR / 100))
+
+  return result
+}
+function applyBuff(data){
+  // data = dupeObj(data)
+  //計算buff
+  for (const buff of [...buffs.default,...buffs.custom]){
+    if (buff.check){
+      for (const ss of buff.stats){
+        const keys = ss.getKey()
+        for (const key of keys){
+          addStat(data,key,ss.getValue(),false)
+        }
+      }
+    }
+  }
+  return data
+}
+function addStat(source,name,val,dupe=false){
+  const data = dupe ? dupeObj(source) : source
+  if (name==="") return data
+  switch (name) {
+    case "imdR":
+      if (val < 0){
+        //扣除無視防禦時，應這樣扣除
+        //(100-i)/100*(100-y)/100=1,(100-i)*(100-y)=10000,100-y=10000/(100-i),y=100-10000/(100-i)
+        let sub = false
+        for (let i=0;i<data.imdR.length;i++){
+          if (data.imdR[i]===-val){
+            data.imdR.splice(i,1)
+            sub = true
+            break
+          }
+        }
+        if (!sub){
+          data[name].push(100-10000/(100+val))
+        }
+      }else {
+        data[name].push(val)
+      }
+      break
+    case "atR":
+      for (const san of ['str','int','luk','dex']){
+        data[san+'R'] += val
+      }
+      break
+    default:
+      if (data.hasOwnProperty(name)) data[name] += val
+  }
+  return data
+}
+
+class BuffStat{
+  constructor(key,value){
+    this.key = key
+    this.value = value
+  }
+
+  getKey(){
+    let result = this.key
+    if (typeof this.key === "function"){
+      try {
+        result = this.key()
+      }catch (e) {
+        result = ""
+      }
+    }
+    if (typeof result === "string"){
+      result = [result]
+    }
+    return result
+  }
+
+  getValue(){
+    if (typeof this.value==="function"){
+      try {
+        return this.value()
+      }catch(e){
+        return 0
+      }
+    }
+    return this.value
+  }
+
+  getDesc(stat){
+    const keys = this.getKey(stat)
+    return `${keys.map(k=>props[k]).join(",")}+${this.getValue(stat)}${keys[0].charAt(keys[0].length-1)==='R'?'%':''}`
+  }
+}
+
+class Buff{
+  constructor(name,...stats) {
+    this.name = name
+    this.stats = stats
+    this.check = false
+  }
+  getDesc(stat){
+    return `${this.name}：${this.stats.map(s=>s.getDesc(stat)).join('，')}`
+  }
+}
+
+class Buffs{
+  static localBuffKey = `stat_buff_data`
+  load(){
+    const local = localStorage.getItem(Buffs.localBuffKey)
+    try {
+      const j = JSON.parse(local)
+      if (Array.isArray(j)){
+        for (const i of j){
+          if (Array.isArray(i) && i.length===3){
+            this.custom.push(new Buff(i[0],new BuffStat(i[1],i[2])))
+          }
+        }
+      }
+    }catch (e) {
+
+    }
+  }
+  constructor() {
+    this.save_func = debounce(()=>{
+      const arr = []
+      for (const s of this.custom){
+        arr.push([s.name,s.stats[0].key,s.stats[0].value])
+      }
+      localStorage.setItem(Buffs.localBuffKey,JSON.stringify(arr))
+    })
+    this.default = [
+      new Buff(`公會BOSS`,new BuffStat("bdR",30)),
+      new Buff(`公會無視`,new BuffStat("imdR",30)),
+      new Buff(`公會總傷`,new BuffStat("damR",30)),
+      new Buff(`公會爆傷`,new BuffStat("cdR",30)),
+      new Buff(`公會祝福`,new BuffStat("pmad",20)),
+      new Buff(`公會大祝福`,new BuffStat("pmad",30)),
+      new Buff(`MVP`,new BuffStat("pmad",30)),
+      new Buff(`破王天氣`,new BuffStat("pmad",30)),
+      new Buff(`聯盟之力`,new BuffStat("pmad",30)),
+      new Buff(`怪公藥水`,new BuffStat("pmad",30)),
+      new Buff(`紅色星星`,new BuffStat("bdR",20)),
+      new Buff(`藍色星星`,new BuffStat("imdR",20)),
+      new Buff(`力量藥水`,new BuffStat("str",30)),
+      new Buff(`智力藥水`,new BuffStat("int",30)),
+      new Buff(`運氣藥水`,new BuffStat("luk",30)),
+      new Buff(`敏捷藥水`,new BuffStat("dex",30)),
+      new Buff(`大英雄`,new BuffStat("damR",10)),
+      new Buff(`章魚燒炒麵`,new BuffStat("pmad",20)),
+      new Buff(`戰鬥機`,new BuffStat("pmad",30)),
+      new Buff(`裝備名匠`,new BuffStat("cdR",5)),
+      new Buff(`275椅子`,new BuffStat("pmad",50)),
+      new Buff(`五轉眼`,new BuffStat("cdR",8)),
+      new Buff(`30等弓手眼`,new BuffStat("cdR",15)),
+      new Buff(`31等弓手眼`,new BuffStat("cdR",16)),
+      new Buff(`主教祝福`,new BuffStat("pmad",50),new BuffStat("bdR",10)),
+      new Buff(`五轉祝福`,new BuffStat("pmad",20)),
+      new Buff(`小屋BOSS`,new BuffStat("bdR",15)),
+      new Buff(`回聲`,new BuffStat("pmadR",4)),
+      new Buff(`狂豹咆哮`,new BuffStat("pmadR",10)),
+      new Buff(`晚上的氣息`,new BuffStat("hp",1000)),
+      new Buff(`武公`,new BuffStat("pmadR",100)),
+      new Buff(`30等楓祝`,new BuffStat(()=>{
+        return mapleBuffStat.value.ps
+      },()=>{
+        return mapleBuffStat.value.maple30
+      })),
+      new Buff(`31等楓祝`,new BuffStat(()=>{
+        return mapleBuffStat.value.ps
+      },()=>{
+        return mapleBuffStat.value.maple31
+      })),
+      new Buff(`30等大楓祝`,new BuffStat(()=>{
+        return mapleBuffStat.value.ps
+      },()=>{
+        return mapleBuffStat.value.maple30Super
+      })),
+      new Buff(`31等大楓祝`,new BuffStat(()=>{
+        return mapleBuffStat.value.ps
+      },()=>{
+        return mapleBuffStat.value.maple31Super
+      })),
+    ]
+    this.custom = []
+    this.load()
+  }
+  save(){
+    this.save_func()
+  }
+  add(name,key,val){
+    this.custom.push(new Buff(name,new BuffStat(key,val)))
+    this.save()
+  }
+  del(i){
+    this.custom.splice(i,1)
+    this.save()
+  }
+}
+
+const buffs = new Buffs() //buff實例
+
+const calcSources = ref([{name:'pmad',val:1,}]) //等效源
+const statNames = ['hp','str','int','luk','dex'] //所有主副屬
+const statRNames = statNames.map(n=>n+'R') //主副屬的%數
+const statDNames = statNames.map(n=>n+'D') //主副屬的未受%加成數
+// parseIndex()
 const gis = "xs:24 s:12 m:8 l:6 xl:4 xxl:4"
 // const calcStatsOptions = Object.keys(calcStats).map(k=>{return {label:props[k],value:k}})
 const calcStatsOptions = computed(()=>{
+  //顯示的屬性，主要用於buff加成及等效屬性計算，過濾掉非主副的屬性
   const result = []
   Object.keys(calcStats).forEach(k=>{
     const option = {label:props[k],value:k}
     if (statNames.indexOf(k)>=0){
-      if (statIsShow(k)) result.push(option)
+      if (showStats.value.includes(k)) result.push(option)
     }else if (statRNames.indexOf(k)>=0 || statDNames.indexOf(k)>=0){
-      if (statIsShow(k.substring(0,k.length-1))) result.push(option)
+      if (showStats.value.includes(k.substring(0,k.length-1))) result.push(option)
     }else {
       result.push(option)
     }
   })
   return result
 })
-const jobOptions = []
-for (const item of jobGroups){
+const jobOptions = jobGroups.map(item=>{
+  //用於職業選擇的數據
   const child = {
     type: "group",
     label: item.name,
@@ -75,19 +362,20 @@ for (const item of jobGroups){
       value: key
     })
   }
-  jobOptions.push(child)
-}
+  return child
+})
 
-function statIsShow(s) {
-  return jobs.hasOwnProperty(stats.value.data.job) && (jobs[stats.value.data.job].ps.indexOf(s)>=0 || jobs[stats.value.data.job].ss.indexOf(s)>=0)
-}
+const showStats = computed(()=>{
+  //主副屬
+  return statNames.filter(k=>jobs.hasOwnProperty(currentStat.value.data.job) && (jobs[currentStat.value.data.job].ps.indexOf(k)>=0 || jobs[currentStat.value.data.job].ss.indexOf(k)>=0))
+})
 
 function statLabel(s) {
   let desc = ""
-  if (statIsShow(s)){
-    if (jobs[stats.value.data.job].ps.indexOf(s)>=0){
+  if (showStats.value.includes(s)){
+    if (jobs[currentStat.value.data.job].ps.indexOf(s)>=0){
       desc = "[主屬]"
-    }else if (jobs[stats.value.data.job].ss.indexOf(s)>=0){
+    }else if (jobs[currentStat.value.data.job].ss.indexOf(s)>=0){
       desc = "[副屬]"
     }
   }
@@ -117,9 +405,127 @@ const numberFormat = computed(()=>{
   }
 })
 
-function handleBack() {
-  router.push(`/stat-calc`)
+function numToRate(num){
+  let p = 1_00
+  num *= p * 100
+  while(num < 10){
+    p *= 10
+    num *= 10
+  }
+  return (Math.round(num) / p).toFixed(p.toFixed().length-1) + '%'
 }
+
+//計算素質
+const def = ref(300)
+const currentStatCalcResult = computed(()=>{
+  getStore().save()
+  return calcSourceData(currentStat.value.data)
+})
+function calcSourceAddonData(addons){
+  const result = dupeObj(calcStats)
+  result.diff = 0
+  result.dDamage = 0
+  if (!jobs.hasOwnProperty(currentStat.value.data.job)){
+    return result
+  }
+  let changed = false
+  const data = dupeObj(currentStat.value.data)
+  for (let source of addons){
+    if (!result.hasOwnProperty(source.name) && source.name!=='atR') continue
+    changed = true
+    addStat(data,source.name,source.val,false)
+  }
+  if (!changed){
+    return result
+  }
+
+  const buffData = applyBuff(dupeObj(currentStat.value.data))
+  const beforeResult = currentStatCalcResult.value
+  const afterResult = calcSourceData(data)
+
+  //計算提升攻擊（提升後的防後暴B功 - 提升前的防後暴B功）
+  const diff = afterResult.defBossCriticalDamage - beforeResult.defBossCriticalDamage
+  result['diff'] = diff
+
+  if (afterResult.defBDamage===0) return result
+
+  //計算提升%
+  result.diffR = formatFloat(diff / beforeResult.defBossCriticalDamage * 100)
+
+  //計算爆傷比例
+  result.cdR = formatFloat((diff / beforeResult.defBDamage * 100))
+
+  //計算提升的防後B功(等於b功 * 減去無視防禦後實際能打的傷害部分)
+  const diffDefBDamage = diff / ( 1.35 + buffData.cdR / 100)
+  //提升的無視防禦率
+  result.imdR = formatFloat(((diffDefBDamage / beforeResult.bDamage) / (def.value / 100) / ( 1 - beforeResult.imdr/100) * 100))
+  //b功 （等於真攻 * （1+傷害+b傷） * （1+終傷））
+  const diffBDamage = diffDefBDamage / beforeResult.remainingDef
+  //表功
+  result.dDamage = formatFloat(Math.floor(diffBDamage / (1+buffData.damR/100+buffData.bdR/100) * (1+buffData.damR/100)))
+  //傷害/b傷
+  result.damR = result.bdR = formatFloat((diffBDamage / beforeResult.damage / (1+buffData.pmdR/100) * 100))
+  //終傷
+  result.pmdR = formatFloat((diffBDamage / beforeResult.damage / (1+buffData.damR/100+buffData.bdR/100) * 100))
+  //真攻 （等於 武器係數 * 屬性 * 攻擊 / 100）
+  const diffDamage = diffBDamage / (1+buffData.pmdR/100) / (1+buffData.damR/100+buffData.bdR/100)
+  //便於計算的真攻 （等於 屬性 * 攻擊）
+  const diffRDamage = diffDamage / beforeResult.wm * 100
+  //最終攻擊
+  const pmadD = diffRDamage / beforeResult.st
+  result.pmadD = formatFloat(pmadD)
+  result.pmad = formatFloat((pmadD / (1+buffData.pmadR/100)))
+  result.pmadR = formatFloat((pmadD / buffData.pmad * 100))
+  //st
+  const diffSt = diffRDamage / Math.floor(buffData.pmad * (1+buffData.pmadR/100) + buffData.pmadD)
+  let aSt = 0
+  switch (data.job) {
+    case "3122":
+      result['strD'] = formatFloat(diffSt)
+      result['str'] = formatFloat((diffSt / (1+buffData['strR']/100)))
+      result['strR'] = formatFloat((diffSt / buffData['str'] * 100))
+
+      result['hpD'] = formatFloat((diffSt / 0.8 * 3.5))
+      result['hp'] = formatFloat((diffSt / 0.8 * 3.5 / (1+buffData['hpR']/100)))
+      result['hpR'] = formatFloat((diffSt / 0.8 * 3.5 / buffData['hp'] * 100))
+
+      aSt += buffData['str']
+      break
+    case "3612":
+      for (const s of jobs[data.job].ps){
+        result[s+'D'] = formatFloat((diffSt / 3))
+        result[s] = formatFloat((diffSt / 3 / (1+buffData[s+'R']/100)))
+        result[s+'R'] = formatFloat((diffSt / 3 / buffData[s] * 100))
+
+        // diffAtSt -= (buffData[s] - buffData[s+'D']) * 3
+        aSt += buffData[s] * 3
+      }
+      break
+    default:
+      for (const s of jobs[data.job].ps){
+        result[s+'D'] = formatFloat((diffSt / 4))
+        result[s] = formatFloat((diffSt / 4 / (1+buffData[s+'R']/100)))
+        result[s+'R'] = formatFloat((diffSt / 4 / buffData[s] * 100))
+
+        aSt += buffData[s] * 4
+      }
+      for (const s of jobs[data.job].ss){
+        result[s+'D'] = formatFloat(diffSt)
+        result[s] = formatFloat((diffSt / (1+buffData[s+'R']/100)))
+        result[s+'R'] = formatFloat((diffSt / buffData[s] * 100))
+
+        aSt += buffData[s]
+      }
+  }
+  result['atR'] = formatFloat(diffSt / aSt * 100)
+
+  return result
+}
+//計算等效屬性
+const sourceStatCalcResult = computed(()=>{
+  return calcSourceAddonData(calcSources.value)
+})
+//極限屬性
 
 const hyperStateLogs = ref(""),calcHyperIng = ref(false)
 const hyperPlans = [
@@ -150,15 +556,6 @@ const currentHyperPoint = ref(0)
 const calcHyperLevel = ref({})
 for (const name of Object.keys(currentHyperLevel.value)){
   calcHyperLevel.value[name] = 0
-}
-function numToRate(num){
-  let p = 1_00
-  num *= p * 100
-  while(num < 10){
-    p *= 10
-    num *= 10
-  }
-  return (Math.round(num) / p).toFixed(p.toFixed().length-1) + '%'
 }
 function calcHyperState() {
   const needPoints = [0 ,1, 2, 4, 8, 10, 15, 20, 25, 30, 35, 50, 65, 80, 95, 110]
@@ -236,7 +633,7 @@ function calcHyperState() {
   calcHyperIng.value = true //正在計算
   hyperStateLogs.value = "" //清空日誌
   //用於比較的屬性，初始是當前屬性
-  let lastStat = stats.value.addStat(stats.value.data,"")
+  let lastStat = dupeObj(currentStat.value.data)
   if (lastStat.level < 140){
     hyperStateLogs.value += "等級不足140無法計算"
     calcHyperIng.value = false
@@ -248,7 +645,7 @@ function calcHyperState() {
     return
   }
   //算出初始素質
-  const initialResult = stats.value.calcNewData(lastStat)
+  const initialResult = currentStatCalcResult.value
   //屬性點數
   let hyperPoint = currentHyperPoint.value
   //當前職業主副屬
@@ -265,7 +662,7 @@ function calcHyperState() {
     const {point,val} = pointAndVal(name,0,currentHyperLevel.value[name])
     // console.log(props[name]+currentHyperLevel.value[name]+',返還點數' + point + ",屬性" + val)
     hyperPoint += point
-    stats.value.addStat(lastStat,name,-val,false)
+    addStat(lastStat,name,-val,false)
     calcHyperLevel.value[name] = 0
 
     //只從有提升的屬性中計算
@@ -285,7 +682,7 @@ function calcHyperState() {
   // hyperStateLogs.value +=` \n---提升順序---\n`
 
   //用於比較的面板
-  let lastResult = stats.value.calcNewData(lastStat)
+  let lastResult = calcSourceData(lastStat)
   // console.log(lastResult.imdr)
   let lastImdR = initialImdR
   const planNames = Object.keys(tempPlan) //屬性名
@@ -311,9 +708,9 @@ function calcHyperState() {
         //如果計算的是無視防禦，則在初始無視的基礎上加算，否則使用最後計算時的無視，這是因為無視作為整體數據不能拆分加算
         lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
         //加上本次加點的屬性
-        const newStat = stats.value.addStat(lastStat,name,val)
+        const newStat = addStat(lastStat,name,val)
         //計算加點後的素質
-        const addResult = stats.value.calcNewData(newStat)
+        const addResult = calcSourceData(newStat)
         //計算加點後增加的素質
         const diff = hyperPlan.value===0 ? addResult.defBossCriticalDamage - lastResult.defBossCriticalDamage : addResult.nDamage - lastResult.nDamage
         //計算性價比
@@ -364,15 +761,15 @@ function calcHyperState() {
     let bestPlan = tempPlan //最好的方案
     for (const plan of allPlans){
       //複製一份屬性
-      let newStat = stats.value.addStat(lastStat,"")
+      let newStat = dupeObj(lastStat)
       newStat.imdR = initialImdR  //更換為初始無視，因為無視需要整體運算
       for (const name in plan){
         if (name !== "point"){
           let {val} = pointAndVal(name,tempPlan[name],plan[name]) //算出增加的屬性值
-          newStat = stats.value.addStat(newStat,name,val,name==='imdR') //算出增加後的屬性，如果是無視時則使用複製模式，否則直接增加
+          newStat = addStat(newStat,name,val,name==='imdR') //算出增加後的屬性，如果是無視時則使用複製模式，否則直接增加
         }
       }
-      const newResult = stats.value.calcNewData(newStat)  //算出新的素質
+      const newResult = calcSourceData(newStat)  //算出新的素質
       // if (plan===testPlan){
       //   console.log("testPlan:" + newResult.defBossCriticalDamage)
       // }
@@ -417,6 +814,7 @@ function calcHyperState() {
   calcHyperIng.value = false
 }
 
+//hexa屬性計算
 const hexaStateLogs = ref(""),calcHexaIng = ref(false)
 const hexaTypesOption = [
   {label:props["cdR"],value:"cdR"},
@@ -443,10 +841,48 @@ const hexaData = ref({
     label:"次要屬性2",
   },
 })
+
+function hexaStat(source,config,isAdd=true){
+  //根據源素質計算hexa加成後的素質
+  const statConfig = {
+    cdR:0.35,
+    bdR:1,
+    imdR:1,
+    damR:0.75,
+    pmad:5,
+  }
+  if (!jobs.hasOwnProperty(source.job)){
+    return source
+  }
+  for (const key in config){
+    const item = config[key]
+    let rate = key==="primary" ? item.level + Math.max(item.level-4,0) + Math.max(item.level-7,0) + Math.max(item.level-9,0) : item.level
+    if (!isAdd) rate = -rate
+    if (item.name==="hexaStat"){
+      switch (source.job) {
+        case "3122":
+          addStat(source,'hpD',rate * 2100)
+          break
+        case "3612":
+          for (const s of jobs[source.job].ps){
+            addStat(source,s+'D',rate * 48)
+          }
+          break
+        default:
+          for (const s of jobs[source.job].ps){
+            addStat(source,s+'D',rate * 100)
+          }
+      }
+    }else if (statConfig.hasOwnProperty(item.name)) {
+      addStat(source,item.name,rate * statConfig[item.name])
+    }
+  }
+  return source
+}
 function calcHexaState() {
   calcHexaIng.value = true
   hexaStateLogs.value = ''
-  if (!jobs.hasOwnProperty(stats.value.data.job)){
+  if (!jobs.hasOwnProperty(currentStat.value.data.job)){
     hexaStateLogs.value += "無職業無法計算"
     calcHexaIng.value = false
     return
@@ -457,13 +893,14 @@ function calcHexaState() {
     calcHexaIng.value = false
     return
   }
-  if (allLv < 2){
+  if (allLv > 20){
     hexaStateLogs.value += "HEXA屬性核心總等級大於20，是否填寫錯誤？"
     calcHexaIng.value = false
     return
   }
-  const sourceStat = stats.value.hexaStat(stats.value.data,hexaData.value,false)
-  const sourceResult = stats.value.calcNewData(sourceStat)
+  const sourceStat = hexaStat(dupeObj(currentStat.value.data),hexaData.value,false)
+  console.table(sourceStat)
+  const sourceResult = calcSourceData(sourceStat)
   hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${sourceResult.defBossCriticalDamage}`
   hexaStateLogs.value +=` \n---開始計算---\n`
   const cd = {
@@ -489,8 +926,8 @@ function calcHexaState() {
         cd.primary.name = pn
         cd.secondary1.name = sn1
         cd.secondary2.name = sn2
-        const ts = stats.value.hexaStat(stats.value.data,cd)
-        const tr = stats.value.calcNewData(ts)
+        const ts = hexaStat(dupeObj(sourceStat),cd)
+        const tr = calcSourceData(ts)
         const diff = tr.defBossCriticalDamage - sourceResult.defBossCriticalDamage
         if (diff > bestDiff){
           bestBCD = tr.defBossCriticalDamage
@@ -505,9 +942,11 @@ function calcHexaState() {
   }
 
   hexaStateLogs.value +=` \n---最終結果---\n`
-  hexaStateLogs.value += `提升最大的組合為：主：${props[bestPn]}(${cd.primary.level}等)，副1：${props[bestSn1]}(${cd.secondary1.level}等)，副2：${props[bestSn2]}(${cd.secondary2.level}等)，防後爆B攻為${bestBCD}，提升${bestDiff}\n`
+  hexaStateLogs.value += `提升最大的組合為：主：${props[bestPn]}(${cd.primary.level}等)，副1：${props[bestSn1]}(${cd.secondary1.level}等)，副2：${props[bestSn2]}(${cd.secondary2.level}等)，防後爆B攻為${numberFormat.value(bestBCD)}，提升${numberFormat.value(bestDiff)}\n`
   calcHexaIng.value = false
 }
+
+
 
 const addBuff = ref({
   key:"pmad",
@@ -521,7 +960,7 @@ const resultPanelCollapseExpanded = ref(['1', '2'])
 
 const statImdR = computed(()=>{
   let mdr = 100
-  for (const v of stats.value.data.imdR){
+  for (const v of currentStat.value.data.imdR){
     mdr *= (100-v)/100
   }
   return 100 - mdr
@@ -529,7 +968,7 @@ const statImdR = computed(()=>{
 </script>
 
 <template>
-  <n-page-header :title="showName.value" @back="handleBack">
+  <n-page-header :title="currentStat.showName" @back="handleBack">
     <n-card>
       <n-tabs default-value="input" size="large" justify-content="space-evenly">
         <n-tab-pane name="input" tab="屬性設定">
@@ -538,14 +977,14 @@ const statImdR = computed(()=>{
               <n-collapse-item title="等級、職業" name="1">
                 <n-grid item-responsive responsive="screen" x-gap="12">
                   <n-form-item-gi label="備註名" :span="gis">
-                    <n-input v-model:value="stats.name" />
+                    <n-input placeholder="備註名" v-model:value="currentStat.name" />
                   </n-form-item-gi>
                   <n-form-item-gi :label="props.level" :span="gis">
-                    <n-input-number min="0" max="300" v-model:value="stats.data.level" />
+                    <n-input-number min="0" max="300" v-model:value="currentStat.data.level" />
                   </n-form-item-gi>
                   <n-form-item-gi :label="props.job" :span="gis">
                     <n-select
-                        v-model:value="stats.data.job"
+                        v-model:value="currentStat.data.job"
                         placeholder="請選擇職業/武器"
                         :options="jobOptions"
                     />
@@ -559,32 +998,32 @@ const statImdR = computed(()=>{
                   </n-alert>
                   <n-grid item-responsive responsive="screen" x-gap="12">
                     <n-form-item-gi :label="props.damR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.damR">
+                      <n-input-number min="0" v-model:value="currentStat.data.damR">
                         <template #suffix>
                           %
                         </template>
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmdR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmdR">
+                      <n-input-number min="0" v-model:value="currentStat.data.pmdR">
                         <template #suffix>
                           %
                         </template>
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.cdR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.cdR">
+                      <n-input-number min="0" v-model:value="currentStat.data.cdR">
                         <template #suffix>
                           %
                         </template>
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmad+'基本數值'" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmad">
+                      <n-input-number min="0" v-model:value="currentStat.data.pmad">
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.pmadR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.pmadR">
+                      <n-input-number min="0" v-model:value="currentStat.data.pmadR">
                         <template #suffix>
                           %
                         </template>
@@ -593,21 +1032,21 @@ const statImdR = computed(()=>{
                     <n-form-item-gi :label="props.pmad+'%未套用數值'" :span="gis">
                       <n-popover trigger="hover">
                         <template #trigger>
-                          <n-input-number min="0" v-model:value="stats.data.pmadD">
+                          <n-input-number min="0" v-model:value="currentStat.data.pmadD">
                           </n-input-number>
                         </template>
                         <span>填入{{props.pmad}}%未套用數值，<br>目前只有陰陽師HP轉換等少數{{props.pmad}}不套用%加成，一般職業填0即可</span>
                       </n-popover>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.bdR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.bdR">
+                      <n-input-number min="0" v-model:value="currentStat.data.bdR">
                         <template #suffix>
                           %
                         </template>
                       </n-input-number>
                     </n-form-item-gi>
                     <n-form-item-gi :label="props.ndR" :span="gis">
-                      <n-input-number min="0" v-model:value="stats.data.ndR">
+                      <n-input-number min="0" v-model:value="currentStat.data.ndR">
                         <template #suffix>
                           %
                         </template>
@@ -623,19 +1062,19 @@ const statImdR = computed(()=>{
                   </n-alert>
                   <n-grid item-responsive responsive="screen" x-gap="12">
                     <n-form-item-gi :span="gis">
-                      <n-button attr-type="button" @click="stats.data.imdR.push(0)">
+                      <n-button attr-type="button" @click="currentStat.data.imdR.push(0)">
                         增加無視防禦率
                       </n-button>
                     </n-form-item-gi>
-                    <template v-for="(item, index) in stats.data.imdR">
+                    <template v-for="(item, index) in currentStat.data.imdR">
                       <n-form-item-gi :label="`${props.imdR}${index + 1}`" :span="gis">
                         <n-input-group>
-                          <n-input-number min="0" max="100" v-model:value="stats.data.imdR[index]">
+                          <n-input-number min="0" max="100" v-model:value="currentStat.data.imdR[index]">
                             <template #suffix>
                               %
                             </template>
                           </n-input-number>
-                          <n-button style="margin-left: 12px" @click="stats.data.imdR.splice(index, 1)">
+                          <n-button style="margin-left: 12px" @click="currentStat.data.imdR.splice(index, 1)">
                             <template #icon>
                               <n-icon>
                                 <Delete />
@@ -648,24 +1087,24 @@ const statImdR = computed(()=>{
                   </n-grid>
                 </n-space>
                 <template #header-extra>
-                  {{stat.formatFloat(statImdR)}}%
+                  {{formatFloat(statImdR)}}%
                 </template>
               </n-collapse-item>
               <n-collapse-item title="主副屬" name="4">
                 <n-space vertical>
                   <n-grid item-responsive responsive="screen" x-gap="12">
-                    <template v-for="s in statNames">
-                      <n-form-item-gi :label="statLabel(s) + ' 按順序填入基本數值、%數值、%未套用數值'" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12" v-if="statIsShow(s)">
+                    <template v-for="s in showStats">
+                      <n-form-item-gi :label="statLabel(s) + ' 按順序填入基本數值、%數值、%未套用數值'" span="xs:24 s:24 m:24 l:12 xl:12 xxl:12">
                         <n-input-group>
                           <n-popover trigger="hover">
                             <template #trigger>
-                              <n-input-number v-model:value="stats.data[s]" />
+                              <n-input-number v-model:value="currentStat.data[s]" />
                             </template>
                             <span>填入ui上顯示的{{props[s]}}基本數值</span>
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
-                              <n-input-number v-model:value="stats.data[s+'R']" :placeholder="props[s+'R']">
+                              <n-input-number v-model:value="currentStat.data[s+'R']" :placeholder="props[s+'R']">
                                 <template #suffix>
                                   %
                                 </template>
@@ -675,7 +1114,7 @@ const statImdR = computed(()=>{
                           </n-popover>
                           <n-popover trigger="hover">
                             <template #trigger>
-                              <n-input-number v-model:value="stats.data[s+'D']" />
+                              <n-input-number v-model:value="currentStat.data[s+'D']" />
                             </template>
                             <span>填入{{props[s]}}%未套用數值</span>
                           </n-popover>
@@ -695,7 +1134,9 @@ const statImdR = computed(()=>{
               有很多人希望可以分別計算不吃BUFF和吃BUFF時的素質，由於直接在屬性設定板塊中填寫吃BUFF後的素質較為繁瑣，且更新素質較為麻煩，所以製作BUFF板塊。<br>
               有了獨立的BUFF板塊後，在屬性設定板塊板塊中只需要填寫乾淨素質，在BUFF板塊勾選需要應用的BUFF，在計算結果板塊中查看的即是應用完BUFF之後的素質。<br>
               如果常用BUFF列表無法滿足，還可以自定BUFF。<br>
-              註：楓祝增加的是按手動增加到屬性值上的屬性點（ui中屬性括號內、加號左側數值減去初始值4，e.g:1000(900+100)，則手動增加的屬性值為900-4=896）增加屬性，一般職業4轉後計算公式可以視為(14+5×等級)*15%/16%捨去小數（你的楓祝加成或許是{{Math.floor((14+5*stats.data.level)*0.15)}}/{{Math.floor((14+5*stats.data.level)*0.16)}}）
+              註：角色起始屬性點為25點，等級為1等，所有屬性點最低為4點，3轉及4轉各給予5點屬性點，所以4轉後角色屬性點總數一般是(等級-1)*5+25-(非主屬個數*4)，除傑諾外4轉職業的屬性點可以視為18+5×等級（起始25點，扣除0-1等的5點，加上3、4轉10點，扣除3個非主屬共12點，即25-5+2*5-3*4=18，再加上0等開始每等5點）
+              註：楓祝增加的是按手動增加到屬性值上的屬性點（ui中浮動框的[基本數值]欄下面的基本）增加屬性，一般職業4轉後計算公式可以視為(18+5×等級)*15%/16%捨去小數（你的楓祝加成或許是{{Math.floor((18+5*currentStat.data.level)*0.15)}}/{{Math.floor((18+5*currentStat.data.level)*0.16)}}）<br>
+              註：大楓祝增加的是楓祝增加的屬性未捨去小數的值乘以4（你的大楓祝加成或許是{{Math.floor((18+5*currentStat.data.level)*0.15*4)}}/{{Math.floor((18+5*currentStat.data.level)*0.16*4)}}）
             </n-alert>
             <n-collapse v-model:expanded-names="buffsPanelCollapseExpanded">
               <n-collapse-item title="常用BUFF" name="1">
@@ -703,7 +1144,7 @@ const statImdR = computed(()=>{
                   <template v-for="buff in buffs.default">
                     <n-checkbox
                         v-model:checked="buff.check"
-                        :label="buff.desc"
+                        :label="buff.getDesc(currentStat.data)"
                     />
                   </template>
                 </n-space>
@@ -749,7 +1190,7 @@ const statImdR = computed(()=>{
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        表攻：{{numberFormat(stats.calcData().value.dDamage)}}
+                        表攻：{{numberFormat(currentStatCalcResult.dDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害%) × (100% + 總傷%)</span>
                     </n-popover>
@@ -757,15 +1198,15 @@ const statImdR = computed(()=>{
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        真攻：{{numberFormat(stats.calcData().value.damage)}}
+                        真攻：{{numberFormat(currentStatCalcResult.damage)}}
                       </template>
-                      <span>武器係數({{stats.data.job===null?'-':jobs[stats.data.job].wm}}) × 屬性加權({{stats.calcData().value.st}}) × 總攻擊力({{Math.floor(stats.data.pmad * (1+stats.data.pmadR/100))}}) ÷ 100</span>
+                      <span>武器係數({{currentStat.data.job===null?'-':jobs[currentStat.data.job].wm}}) × 屬性加權({{currentStatCalcResult.st}}) × 總攻擊力({{Math.floor(currentStat.data.pmad * (1+currentStat.data.pmadR/100))}}) ÷ 100</span>
                     </n-popover>
                   </n-gi>
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        B攻：{{numberFormat(stats.calcData().value.bDamage)}}
+                        B攻：{{numberFormat(currentStatCalcResult.bDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害% + B傷%) × (100% + 總傷%)</span>
                     </n-popover>
@@ -773,7 +1214,7 @@ const statImdR = computed(()=>{
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        一般：{{numberFormat(stats.calcData().value.nDamage)}}
+                        一般：{{numberFormat(currentStatCalcResult.nDamage)}}
                       </template>
                       <span>真攻 × (100% + 傷害% + 一般傷害%) × (100% + 總傷%)</span>
                     </n-popover>
@@ -781,13 +1222,13 @@ const statImdR = computed(()=>{
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        無視：{{stat.formatFloat(stats.calcData().value.imdr)}}%
+                        無視：{{formatFloat(currentStatCalcResult.imdr)}}%
                       </template>
                       <span>計算BUFF後的無視防禦率%</span>
                     </n-popover>
                   </n-gi>
                   <n-form-item-gi label-placement="left" label="目標防禦%" :span="gis">
-                    <n-input-number min="0" v-model:value="stats.def">
+                    <n-input-number min="0" v-model:value="def">
                       <template #suffix>
                         %
                       </template>
@@ -796,15 +1237,15 @@ const statImdR = computed(()=>{
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        防後B攻：{{numberFormat(stats.calcData().value.defBDamage)}}
+                        防後B攻：{{numberFormat(currentStatCalcResult.defBDamage)}}
                       </template>
-                      <span>無視：{{stats.calcData().value.imdr.toFixed(2)}}%，剩餘防禦：{{(100 - stats.calcData().value.remainingDef * 100).toFixed(2)}}%<br />B攻 × (100% - 剩餘防禦%)</span>
+                      <span>無視：{{currentStatCalcResult.imdr.toFixed(2)}}%，剩餘防禦：{{(100 - currentStatCalcResult.remainingDef * 100).toFixed(2)}}%<br />B攻 × (100% - 剩餘防禦%)</span>
                     </n-popover>
                   </n-gi>
                   <n-gi :span="gis">
                     <n-popover trigger="hover">
                       <template #trigger>
-                        防後暴B攻：{{numberFormat(stats.calcData().value.defBossCriticalDamage)}}
+                        防後暴B攻：{{numberFormat(currentStatCalcResult.defBossCriticalDamage)}}
                       </template>
                       <span>防後B攻 × (135% + 爆傷%)，按平均爆傷計算</span>
                     </n-popover>
@@ -852,44 +1293,42 @@ const statImdR = computed(()=>{
 
                     <n-gi :span="gis">
                       <n-popover trigger="hover">
-                        <template #trigger>提升防後爆B攻：{{stats.calcSourceResult().value.diff}}</template>
+                        <template #trigger>提升防後爆B攻：{{sourceStatCalcResult.diff}}</template>
                         <span>提升所有等效屬性後增加的防後爆B攻</span>
                       </n-popover>
                     </n-gi>
                     <n-gi :span="gis">
                       <n-popover trigger="hover">
-                        <template #trigger>提升%：{{stats.calcSourceResult().value.diffR}}%</template>
+                        <template #trigger>提升%：{{sourceStatCalcResult.diffR}}%</template>
                         <span>提升所有等效屬性後增加的防後爆B攻相對於未提升時的%數</span>
                       </n-popover>
                     </n-gi>
                     <n-gi :span="gis">
                       <n-popover trigger="hover">
-                        <template #trigger>表攻：{{stats.calcSourceResult().value.dDamage}}</template>
+                        <template #trigger>表攻：{{sourceStatCalcResult.dDamage}}</template>
                         <span>提升所有等效屬性後增加的表攻</span>
                       </n-popover>
                     </n-gi>
-                    <template  v-for="s in statNames">
-                      <template v-if="statIsShow(s)">
-                        <n-gi :span="gis">{{props[s]}}：{{stats.calcSourceResult().value[s]}}</n-gi>
-                        <n-gi :span="gis">{{props[s+'R']}}：{{stats.calcSourceResult().value[s+'R']}}%</n-gi>
-                        <n-gi :span="gis">{{props[s+'D']}}：{{stats.calcSourceResult().value[s+'D']}}</n-gi>
-                      </template>
+                    <template  v-for="s in showStats">
+                      <n-gi :span="gis">{{props[s]}}：{{sourceStatCalcResult[s]}}</n-gi>
+                      <n-gi :span="gis">{{props[s+'R']}}：{{sourceStatCalcResult[s+'R']}}%</n-gi>
+                      <n-gi :span="gis">{{props[s+'D']}}：{{sourceStatCalcResult[s+'D']}}</n-gi>
                     </template>
-                    <n-gi :span="gis">{{props.atR}}：{{stats.calcSourceResult().value.atR}}%</n-gi>
-                    <n-gi :span="gis">{{props.pmad}}：{{stats.calcSourceResult().value.pmad}}</n-gi>
-                    <n-gi :span="gis">{{props.pmadR}}：{{stats.calcSourceResult().value.pmadR}}%</n-gi>
-                    <n-gi :span="gis">{{props.pmadD}}：{{stats.calcSourceResult().value.pmadD}}</n-gi>
-                    <n-gi :span="gis">{{props.damR}}/{{props.bdR}}：{{stats.calcSourceResult().value.damR}}%</n-gi>
-                    <n-gi :span="gis">{{props.imdR}}：{{stats.calcSourceResult().value.imdR}}%</n-gi>
-                    <n-gi :span="gis">{{props.pmdR}}：{{stats.calcSourceResult().value.pmdR}}%</n-gi>
-                    <n-gi :span="gis">{{props.cdR}}：{{stats.calcSourceResult().value.cdR}}%</n-gi>
+                    <n-gi :span="gis">{{props.atR}}：{{sourceStatCalcResult.atR}}%</n-gi>
+                    <n-gi :span="gis">{{props.pmad}}：{{sourceStatCalcResult.pmad}}</n-gi>
+                    <n-gi :span="gis">{{props.pmadR}}：{{sourceStatCalcResult.pmadR}}%</n-gi>
+                    <n-gi :span="gis">{{props.pmadD}}：{{sourceStatCalcResult.pmadD}}</n-gi>
+                    <n-gi :span="gis">{{props.damR}}/{{props.bdR}}：{{sourceStatCalcResult.damR}}%</n-gi>
+                    <n-gi :span="gis">{{props.imdR}}：{{sourceStatCalcResult.imdR}}%</n-gi>
+                    <n-gi :span="gis">{{props.pmdR}}：{{sourceStatCalcResult.pmdR}}%</n-gi>
+                    <n-gi :span="gis">{{props.cdR}}：{{sourceStatCalcResult.cdR}}%</n-gi>
                   </n-grid>
                 </n-space>
               </n-collapse-item>
               <n-collapse-item title="極限屬性" name="3">
                 <n-space vertical>
                   <n-alert :show-icon="false">
-                    計算超級屬性時建議先將暴擊率點到100%。<br>
+                    計算極限屬性時建議先將暴擊率點到100%。<br>
                     注意計算結果受“素質”ui中的目標防禦%影響<br>
                     設置當前Lv後，在計算時將會自動扣除當前Lv增加的素質並返還使用的SP，所以剩餘SP僅需要填寫當前ui中顯示的剩餘SP即可。
                   </n-alert>
@@ -949,11 +1388,11 @@ const statImdR = computed(()=>{
         </n-tab-pane>
       </n-tabs>
     </n-card>
-<!--    <template #extra>-->
-<!--      <n-space>-->
-<!--        <n-button>help</n-button>-->
-<!--      </n-space>-->
-<!--    </template>-->
+    <template #extra>
+      <n-space>
+        <n-button @click="getStore().save()">立即儲存</n-button>
+      </n-space>
+    </template>
   </n-page-header>
 </template>
 

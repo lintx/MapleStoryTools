@@ -1,7 +1,7 @@
 import {createRouter,createWebHashHistory} from 'vue-router'
 import Index from '@/components/Index.vue'
-import StatCalcIndex from '@/components/StatCalcIndex.vue'
-import StatCalc from '@/components/StatCalc.vue'
+import StatCalcIndex from '@/components/stat_calc/StatCalcIndex.vue'
+import StatCalc from '@/components/stat_calc/StatCalc.vue'
 import bonusCalc from '@/components/bonus_stats/Calc.vue'
 
 const index = Index

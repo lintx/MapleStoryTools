@@ -1,5 +1,6 @@
 <script setup>
 import {Calculation} from "@vicons/carbon";
+import {ChecklistFilled} from "@vicons/material"
 
 const tools = [
   {
@@ -13,7 +14,7 @@ const tools = [
     title: '星火計算機',
     path:'/bonus-calc',
     desc: '計算裝備星火素質',
-  }
+  },
 ]
 const links = [
   {
