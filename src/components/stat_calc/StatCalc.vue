@@ -37,7 +37,6 @@ const mapleBuffStat = computed(() => {
       const allStats = (currentStat.value.data.level-1)*5+25-((4-psCount)*4)+10
       baseAddStat = allStats / psCount
   }
-  console.log(baseAddStat)
 
   return {
     ps,
