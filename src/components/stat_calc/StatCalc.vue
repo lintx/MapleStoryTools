@@ -254,7 +254,7 @@ class Buffs{
       }
       localStorage.setItem(Buffs.localBuffKey,JSON.stringify(arr))
     })
-    this.default = [
+    this.default = reactive([
       new Buff(`公會BOSS`,new BuffStat("bdR",30)),
       new Buff(`公會無視`,new BuffStat("imdR",30)),
       new Buff(`公會總傷`,new BuffStat("damR",30)),
@@ -306,8 +306,8 @@ class Buffs{
       },()=>{
         return mapleBuffStat.value.maple31Super
       })),
-    ]
-    this.custom = []
+    ])
+    this.custom = reactive([])
     this.load()
   }
   save(){
@@ -415,10 +415,14 @@ function numToRate(num){
   return (Math.round(num) / p).toFixed(p.toFixed().length-1) + '%'
 }
 
+function saveStore(){
+  getStore().save()
+  message.success("档案已储存");
+}
 //計算素質
 const def = ref(300)
 const currentStatCalcResult = computed(()=>{
-  getStore().save()
+  saveStore()
   return calcSourceData(currentStat.value.data)
 })
 function calcSourceAddonData(addons){
@@ -1144,7 +1148,7 @@ const statImdR = computed(()=>{
                   <template v-for="buff in buffs.default">
                     <n-checkbox
                         v-model:checked="buff.check"
-                        :label="buff.getDesc(currentStat.data)"
+                        :label="buff.getDesc()"
                     />
                   </template>
                 </n-space>
@@ -1172,7 +1176,7 @@ const statImdR = computed(()=>{
                     <n-space item-style="display: flex;" align="center">
                       <n-checkbox
                           v-model:checked="buff.check"
-                          :label="buff.desc"
+                          :label="buff.getDesc()"
                       />
                       <n-button size="small" @click="buffs.del(index)">刪除</n-button>
                     </n-space>
@@ -1390,7 +1394,7 @@ const statImdR = computed(()=>{
     </n-card>
     <template #extra>
       <n-space>
-        <n-button @click="getStore().save()">立即儲存</n-button>
+        <n-button @click="saveStore">立即儲存</n-button>
       </n-space>
     </template>
   </n-page-header>
