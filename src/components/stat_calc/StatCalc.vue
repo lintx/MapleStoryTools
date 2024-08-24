@@ -712,7 +712,7 @@ function calcHyperState() {
         //如果計算的是無視防禦，則在初始無視的基礎上加算，否則使用最後計算時的無視，這是因為無視作為整體數據不能拆分加算
         lastStat.imdR = name==='imdR' ? initialImdR : lastImdR
         //加上本次加點的屬性
-        const newStat = addStat(lastStat,name,val)
+        const newStat = addStat(lastStat,name,val,true)
         //計算加點後的素質
         const addResult = calcSourceData(newStat)
         //計算加點後增加的素質
