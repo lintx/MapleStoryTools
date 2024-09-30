@@ -14,19 +14,16 @@ const data = computed(() => {
     tmp.children = []
     result.push(tmp)
     tmpProfile[tmp.id] = tmp
-    tmp.children.push({id:100,name:'abc'})
+    // tmp.children.push({id:100,name:'abc'})
   }
-  const delIds = []
   for (const item of todoList.value){
     if (tmpProfile.hasOwnProperty(item.profile_id)){
       const p = tmpProfile[item.profile_id]
       p.children.push({...item})
     }else {
       deleteTodoItem(item.id)
-      delIds.push(item.id)
     }
   }
-  deleteRefTodoItems(delIds)
   return result
 });
 let db;
@@ -92,10 +89,11 @@ dbRequest.onupgradeneeded = (event)=>{
 function deleteTodoItem(id){
   const {storeList} = getStores(`readwrite`)
   storeList.delete(id)
+  deleteRefTodoItems([id])
 }
 function deleteRefTodoItems(ids){
-  for(let i=ids.length-1;i>=0;i++){
-    for (let j=todoList.value.length-1;i>=0;i--){
+  for(let i=ids.length-1;i<ids.length;i++){
+    for (let j=todoList.value.length-1;j>=0;j--){
       if (todoList.value[j].id===ids[i]) todoList.value.splice(j,1)
     }
   }
@@ -104,7 +102,7 @@ function formatDbData(item, val) {
   if (typeof val === "object"){
     for (const k in item){
       if (val.hasOwnProperty(k)){
-        item[k] = item[k]
+        item[k] = val[k]
       }
     }
     if (val.hasOwnProperty("id")){
@@ -125,38 +123,37 @@ function formatToItem(val){
     start_time:new Date(),
     end_time:new Date(),
     refresh_type:0,
-    refresh_day:0,
+    refresh_day:1,
     event_count:1,
     done_count:0,
     on_done_time:new Date(),
     is_notify:true,
-    notify_time:new Date(),
+    notify_time:"20:00",
     on_notify_time:new Date(),
   }
   formatDbData(item,val)
+  return item
 }
 function deleteProfile(id){
   const {storeProfile} = getStores(`readwrite`)
   storeProfile.delete(id)
-  for (let j=profiles.value.length-1;i>=0;i--){
+  for (let j=profiles.value.length-1;j>=0;j--){
     if (profiles.value[j].id===id) profiles.value.splice(j,1)
   }
-  const ids = []
   for (const item of todoList.value){
     if (item.profile_id===id) {
-      ids.push(item.id)
       deleteTodoItem(item.id)
     }
   }
-  deleteRefTodoItems(ids)
 }
 function changeProfile(val) {
   ///調用前應先使用{...xx}拷貝原始數據，再修改，最後調用
   const {storeProfile} = getStores(`readwrite`)
   const item = {...val}
+  delete item.children
   for (const [i,v] of profiles.value.entries()){
     if (v.id===item.id) {
-      storeProfile.put(item,v.id).onsuccess = event => {
+      storeProfile.put(item).onsuccess = event => {
         profiles.value[i] = item
       }
       return
@@ -169,7 +166,7 @@ function changeTodo(val){
   const item = {...val}
   for (const [i,v] of todoList.value.entries()){
     if (v.id===item.id) {
-      storeList.put(item,v.id).onsuccess = event => {
+      storeList.put(item).onsuccess = event => {
         todoList.value[i] = item
       }
       return
@@ -178,7 +175,6 @@ function changeTodo(val){
 }
 function addProfile(val){
   const {storeProfile} = getStores(`readwrite`)
-  console.log(storeProfile)
   const item = {...val}
   storeProfile.add(item).onsuccess = event => {
     item.id = event.target.result
@@ -220,6 +216,56 @@ function editGroupNameSubmit(){
   }
   editGroupData.value.show = false
 }
+
+const weeks = [
+  {label:"週一",value:1},
+  {label:"週四",value:4},
+  {label:"週二",value:2},
+  {label:"週三",value:3},
+  {label:"週五",value:5},
+  {label:"週六",value:6},
+  {label:"週日",value:0},
+]
+
+const editTodo = ref({
+  add:true,
+  show:false,
+  item:formatToItem({})
+})
+function addTodoClick(id){
+  editTodo.value.add = true
+  editTodo.value.item = formatToItem({profile_id:id})
+  editTodo.value.show = true
+}
+function editTodoClick(item){
+  editTodo.value.add = false
+  editTodo.value.item = formatToItem(item)
+  editTodo.value.show = true
+}
+function editTodoSubmit(){
+  if (editTodo.value.item.name==="") return
+  if(editTodo.value.add){
+    addTodo(editTodo.value.item)
+  }else {
+    changeTodo(editTodo.value.item)
+  }
+  editTodo.value.show = false
+}
+function getDesc(item){
+  let text = ``
+  if (item.refresh_type===0){
+    text += `每日重置`
+  }else {
+    text += `${item.done_count}/${item.event_count}次`
+    for (const w of weeks){
+      if (w.value===item.refresh_type){
+        text += `，${w.label}重置`
+        break
+      }
+    }
+  }
+  return text
+}
 </script>
 
 <template>
@@ -228,6 +274,43 @@ function editGroupNameSubmit(){
       <n-form label-placement="left" label-width="auto" require-mark-placement="right-hanging">
         <n-form-item label="分組名" path="inputValue">
           <n-input v-model:value="editGroupData.item.name" placeholder="分組名,e.g:本尊" />
+        </n-form-item>
+      </n-form>
+    </div>
+  </n-modal>
+  <n-modal v-model:show="editTodo.show" preset="dialog" :title="editTodo.add?'新增事項':'修改事項'" positive-text="確認" negative-text="取消" @positive-click="editTodoSubmit">
+    <div>
+      <n-form label-placement="left" label-width="auto" require-mark-placement="right-hanging">
+        <n-form-item label="事項名" path="inputValue">
+          <n-input v-model:value="editTodo.item.name" placeholder="事項名,e.g:打里程王" />
+        </n-form-item>
+        <n-form-item label="事項週期" path="radioGroupValue">
+          <n-radio-group v-model:value="editTodo.item.refresh_type" name="bonus-radio-group">
+            <n-space>
+              <n-radio :value="0">每日重置</n-radio>
+              <n-radio :value="1">每周重置</n-radio>
+            </n-space>
+          </n-radio-group>
+        </n-form-item>
+        <n-form-item v-if="editTodo.item.refresh_type===1" label="重置時機" feedback="將在選擇日期的凌晨對事項重置為未完成狀態">
+          <n-select
+              v-model:value="editTodo.item.refresh_day"
+              placeholder="週幾重置？"
+              :options="weeks"
+          />
+        </n-form-item>
+        <n-form-item v-if="editTodo.item.refresh_type===1" label="每週幾次" path="inputValue">
+          <n-input-number v-model:value="editTodo.item.event_count" min="1" max="7" placeholder="每週幾次" />
+        </n-form-item>
+        <n-form-item label="開啟通知" path="inputValue" feedback="需要允許瀏覽器通知">
+          <n-switch v-model:value="editTodo.item.is_notify" />
+        </n-form-item>
+        <n-form-item v-if="editTodo.item.is_notify" label="通知時間" path="inputValue">
+          <n-time-picker
+              v-model:formatted-value="editTodo.item.notify_time"
+              :minutes="5"
+              format="HH:mm"
+          />
         </n-form-item>
       </n-form>
     </div>
@@ -245,14 +328,39 @@ function editGroupNameSubmit(){
       <n-collapse v-model:expanded-names="showProfiles" :trigger-areas="['main', 'arrow']" display-directive="show">
         <template v-for="(item,index) in data">
           <n-collapse-item :title="item.name" :name="item.id">
+            <template #header-extra>
+              <n-space>
+                <n-popconfirm
+                    @positive-click="deleteProfile(item.id)"
+                    negative-text="不"
+                    positive-text="好"
+                >
+                  <template #trigger>
+                    <n-button>刪除</n-button>
+                  </template>
+                  刪除後將無法找回！
+                </n-popconfirm>
+                <n-button @click="editGroup(item)">改名</n-button>
+                <n-button @click="addTodoClick(item.id)">新增事項</n-button>
+              </n-space>
+            </template>
             <n-list>
               <template v-for="todo in item.children">
                 <n-list-item>
                   <n-thing title="Thing">
                     <template #header-extra>
                       <n-space>
-                        <n-button>刪除</n-button>
-                        <n-button>修改</n-button>
+                        <n-popconfirm
+                            @positive-click="deleteTodoItem(todo.id)"
+                            negative-text="不"
+                            positive-text="好"
+                        >
+                          <template #trigger>
+                            <n-button>刪除</n-button>
+                          </template>
+                          刪除後將無法找回！
+                        </n-popconfirm>
+                        <n-button @click="editTodoClick(todo)">修改</n-button>
                         <n-button>完成</n-button>
                       </n-space>
                     </template>
@@ -260,19 +368,12 @@ function editGroupNameSubmit(){
                       {{todo.name}}
                     </template>
                     <template #description>
-                      description
+                      {{getDesc(todo)}}
                     </template>
                   </n-thing>
                 </n-list-item>
               </template>
             </n-list>
-            <template #header-extra>
-              <n-space>
-                <n-button @click="console.log('a')">刪除</n-button>
-                <n-button @click="console.log('a')">改名</n-button>
-                <n-button @click="console.log('a')">新增</n-button>
-              </n-space>
-            </template>
           </n-collapse-item>
         </template>
       </n-collapse>
