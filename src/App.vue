@@ -1,11 +1,12 @@
 <script setup>
 import SiteHeader from "./components/SiteHeader.vue";
 import {useTheme} from "@/assets/store.js";
+import { dateZhTW, zhTW } from "naive-ui";
 const theme = useTheme()
 </script>
 
 <template>
-  <n-config-provider :theme="theme">
+  <n-config-provider :theme="theme" :locale="zhTW" :date-locale="dateZhTW">
     <n-loading-bar-provider>
       <n-message-provider>
         <n-notification-provider>

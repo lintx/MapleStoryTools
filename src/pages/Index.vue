@@ -1,21 +1,8 @@
 <script setup>
-import {Calculation} from "@vicons/carbon";
-import {ChecklistFilled} from "@vicons/material"
+const router = useRouter()
 
-const tools = [
-  {
-    icon:Calculation,
-    title:'屬性計算機',
-    path:'/stat-calc',
-    desc:'根據角色屬性計算收益等',
-  },
-  {
-    icon:Calculation,
-    title: '星火計算機',
-    path:'/bonus-calc',
-    desc: '計算裝備星火素質',
-  },
-]
+const tools = router.options.routes.filter(r=>r.meta.showInNav!==false).map(r=>{return {...r.meta,path:r.path}}).sort((a,b)=>a.sort-b.sort)
+
 const links = [
   {
     title:'聯盟戰地排序工具',
@@ -42,6 +29,17 @@ const links = [
     url: 'https://maplestory-arcane-symbol-calculator.vercel.app/zh-tw',
   },
 ]
+
+
+defineOptions({
+  route:{
+    meta:{
+      label:'首页',
+      showInNav:false,
+    },
+    path:"/",
+  }
+})
 </script>
 
 <template>
@@ -55,7 +53,7 @@ const links = [
             </router-link>
           </template>
           <template #cover>
-            <n-icon :component="tool.icon" size="300" />
+            <n-icon :component="tool.icon" size="80" />
           </template>
           {{tool.desc}}
         </n-card>

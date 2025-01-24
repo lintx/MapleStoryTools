@@ -6,6 +6,16 @@ import {watch} from "vue"
 import {dupeObj, formatFloat, getCalcStats, getJobs, getPropNames, getStore} from "./store.js"
 import {debounce} from "@/utils/debounce.js";
 
+defineOptions({
+  route:{
+    meta:{
+      title:'首页',
+      sort:0,
+    },
+    path:"/stat-calc/:index",
+  }
+})
+
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
@@ -828,7 +838,7 @@ const hexaTypesOption = [
   {label:props["pmad"],value:"pmad"},
   {label:props["hexaStat"],value:"hexaStat"},
 ]
-const hexaData = ref({
+const hexaData = ref([{
   primary:{
     level:0,
     name:"",
@@ -844,7 +854,23 @@ const hexaData = ref({
     name:"",
     label:"次要屬性2",
   },
-})
+},{
+  primary:{
+    level:0,
+    name:"",
+    label:"主要屬性",
+  },
+  secondary1:{
+    level:0,
+    name:"",
+    label:"次要屬性1",
+  },
+  secondary2:{
+    level:0,
+    name:"",
+    label:"次要屬性2",
+  },
+}])
 
 function hexaStat(source,config,isAdd=true){
   //根據源素質計算hexa加成後的素質
@@ -858,30 +884,65 @@ function hexaStat(source,config,isAdd=true){
   if (!jobs.hasOwnProperty(source.job)){
     return source
   }
-  for (const key in config){
-    const item = config[key]
-    let rate = key==="primary" ? item.level + Math.max(item.level-4,0) + Math.max(item.level-7,0) + Math.max(item.level-9,0) : item.level
-    if (!isAdd) rate = -rate
-    if (item.name==="hexaStat"){
-      switch (source.job) {
-        case "3122":
-          addStat(source,'hpD',rate * 2100)
-          break
-        case "3612":
-          for (const s of jobs[source.job].ps){
-            addStat(source,s+'D',rate * 48)
-          }
-          break
-        default:
-          for (const s of jobs[source.job].ps){
-            addStat(source,s+'D',rate * 100)
-          }
+  for (const cfg of config){
+    for (const key in cfg){
+      const item = cfg[key]
+      let rate = key==="primary" ? item.level + Math.max(item.level-4,0) + Math.max(item.level-7,0) + Math.max(item.level-9,0) : item.level
+      if (!isAdd) rate = -rate
+      if (item.name==="hexaStat"){
+        switch (source.job) {
+          case "3122":
+            addStat(source,'hpD',rate * 2100)
+            break
+          case "3612":
+            for (const s of jobs[source.job].ps){
+              addStat(source,s+'D',rate * 48)
+            }
+            break
+          default:
+            for (const s of jobs[source.job].ps){
+              addStat(source,s+'D',rate * 100)
+            }
+        }
+      }else if (statConfig.hasOwnProperty(item.name)) {
+        addStat(source,item.name,rate * statConfig[item.name])
       }
-    }else if (statConfig.hasOwnProperty(item.name)) {
-      addStat(source,item.name,rate * statConfig[item.name])
     }
   }
+
   return source
+}
+function getOneHexaPlans(){
+  //計算單顆核心所有可能的組合
+  const onePlans = []
+  for (const {value:n1} of hexaTypesOption){
+    for (const {value:n2} of hexaTypesOption){
+      if (n1===n2) continue
+      for (const {value:n3} of hexaTypesOption){
+        if (n1===n3 || n2===n3) continue
+        onePlans.push([n1,n2,n3])
+      }
+    }
+  }
+  return onePlans
+}
+function allHexaPlan(arr,m) {
+  const result = [];
+
+  function permute(currentPermutation) {
+    if (currentPermutation.length === m) {
+      result.push(currentPermutation);
+      return;
+    }
+    for (let i = 0; i < arr.length; i++) {
+      if (currentPermutation.indexOf(arr[i]) === -1) {
+        permute(currentPermutation.concat(arr[i]));
+      }
+    }
+  }
+
+  permute([]); // 从空数组开始
+  return result;
 }
 function calcHexaState() {
   calcHexaIng.value = true
@@ -891,62 +952,106 @@ function calcHexaState() {
     calcHexaIng.value = false
     return
   }
-  const allLv = hexaData.value.primary.level + hexaData.value.secondary1.level + hexaData.value.secondary2.level
-  if (allLv < 1){
-    hexaStateLogs.value += "HEXA屬性核心總等級小於1無法計算"
-    calcHexaIng.value = false
-    return
+
+  const hdns = []
+  for (const data of hexaData.value){
+    if (data.primary.name!==""){
+      if (hdns.indexOf(data.primary.name) >= 0){
+        hexaStateLogs.value += "多顆HEXA屬性核心的主屬性有重複，請檢查是否填寫錯誤"
+        calcHexaIng.value = false
+        return
+      }
+      hdns.push(data.primary.name)
+    }
+
+    const allLv = data.primary.level + data.secondary1.level + data.secondary2.level
+    if (allLv < 1){
+      hexaStateLogs.value += "HEXA屬性核心總等級小於1無法計算"
+      calcHexaIng.value = false
+      return
+    }
+    if (allLv > 20){
+      hexaStateLogs.value += "HEXA屬性核心總等級大於20，是否填寫錯誤？"
+      calcHexaIng.value = false
+      return
+    }
   }
-  if (allLv > 20){
-    hexaStateLogs.value += "HEXA屬性核心總等級大於20，是否填寫錯誤？"
-    calcHexaIng.value = false
-    return
-  }
+
   const sourceStat = hexaStat(dupeObj(currentStat.value.data),hexaData.value,false)
   console.table(sourceStat)
   const sourceResult = calcSourceData(sourceStat)
-  hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${sourceResult.defBossCriticalDamage}`
-  hexaStateLogs.value +=` \n---開始計算---\n`
-  const cd = {
-    primary:{
-      level:hexaData.value.primary.level,
-      name:"",
-    },
-    secondary1:{
-      level:hexaData.value.secondary1.level,
-      name:"",
-    },
-    secondary2:{
-      level:hexaData.value.secondary2.level,
-      name:"",
-    },
+  hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${numberFormat.value(sourceResult.defBossCriticalDamage)}`
+  const deductDiff = currentStatCalcResult.value.defBossCriticalDamage - sourceResult.defBossCriticalDamage
+  // hexaStateLogs.value +=` \n---開始計算---\n`
+
+  //計算單顆核心所有可能的組合
+  const onePlans = getOneHexaPlans()
+  const onePlansIndex = []
+  for (let i=0,l=onePlans.length;i<l;i++){
+    onePlansIndex.push(i)
   }
-  let bestPn="",bestSn1="",bestSn2="",bestDiff=0,bestBCD=0
-  for (const {value:pn} of hexaTypesOption){
-    for (const {value:sn1} of hexaTypesOption){
-      if (pn===sn1) continue
-      for (const {value:sn2} of hexaTypesOption){
-        if (pn===sn2 || sn1===sn2) continue
-        cd.primary.name = pn
-        cd.secondary1.name = sn1
-        cd.secondary2.name = sn2
-        const ts = hexaStat(dupeObj(sourceStat),cd)
-        const tr = calcSourceData(ts)
-        const diff = tr.defBossCriticalDamage - sourceResult.defBossCriticalDamage
-        if (diff > bestDiff){
-          bestBCD = tr.defBossCriticalDamage
-          bestDiff = diff
-          bestPn = pn
-          bestSn1 = sn1
-          bestSn2 = sn2
-        }
-        hexaStateLogs.value += `主：${props[pn]}(${cd.primary.level}等)，副1：${props[sn1]}(${cd.secondary1.level}等)，副2：${props[sn2]}(${cd.secondary2.level}等)，防後爆B攻為${tr.defBossCriticalDamage}，提升${diff}\n`
+  const allPlansIndex = allHexaPlan(onePlansIndex,hexaData.value.length)
+  console.log(onePlans)
+  console.log(allPlansIndex)
+  const filterPlans = []
+  let bestDiff = 0,bestBCD=0,bestCd = []
+  for (const planIndexS of allPlansIndex){
+    const usedMainNames = []
+    let hasRepeat = false
+    const plan = []
+    for (const [i,index] of planIndexS.entries()){
+      const p = onePlans[index]
+      if (usedMainNames.indexOf(p[0]) >= 0) {
+        hasRepeat = true
+        break
+      }
+      usedMainNames.push(p[0])
+      plan.push({primary:{
+          level:hexaData.value[i].primary.level,
+          name:p[0],
+        },secondary1:{
+          level:hexaData.value[i].secondary1.level,
+          name:p[1],
+        },secondary2:{
+          level:hexaData.value[i].secondary2.level,
+          name:p[2],
+        },})
+    }
+    if (hasRepeat) continue
+    const ts = hexaStat(dupeObj(sourceStat),plan)
+    const tr = calcSourceData(ts)
+    const diff = tr.defBossCriticalDamage - sourceResult.defBossCriticalDamage
+    if (diff > bestDiff){
+      bestBCD = tr.defBossCriticalDamage
+      bestDiff = diff
+      bestCd = plan
+    }
+    filterPlans.push(plan)
+  }
+  console.log(filterPlans)
+  console.log(bestCd,bestDiff,bestBCD)
+
+  let currentIsBest = true
+  for (const [i,item] of hexaData.value.entries()){
+    for (const position in item){
+      if (item[position].name !== bestCd[i][position].name){
+        currentIsBest = false
+        break
       }
     }
   }
 
-  hexaStateLogs.value +=` \n---最終結果---\n`
-  hexaStateLogs.value += `提升最大的組合為：主：${props[bestPn]}(${cd.primary.level}等)，副1：${props[bestSn1]}(${cd.secondary1.level}等)，副2：${props[bestSn2]}(${cd.secondary2.level}等)，防後爆B攻為${numberFormat.value(bestBCD)}，提升${numberFormat.value(bestDiff)}\n`
+
+  hexaStateLogs.value +=` \n---計算結果---\n`
+  if (currentIsBest){
+    hexaStateLogs.value += `當前組合已是最佳組合\n`
+  }else {
+    hexaStateLogs.value += `提升最大的組合為：\n`
+    for (const [i,item] of bestCd.entries()){
+      hexaStateLogs.value += `第${i+1}顆核心：主：${props[item.primary.name]}(${item.primary.level}等)，副1：${props[item.secondary1.name]}(${item.secondary1.level}等)，副2：${props[item.secondary2.name]}(${item.secondary2.level}等)\n`
+    }
+    hexaStateLogs.value += `防後爆B攻為${numberFormat.value(bestBCD)}，提升${numberFormat.value(bestDiff - deductDiff)}\n`
+  }
   calcHexaIng.value = false
 }
 
@@ -1362,23 +1467,27 @@ const statImdR = computed(()=>{
               </n-collapse-item>
               <n-collapse-item title="HEXA屬性" name="4">
                 <n-space vertical>
-                  <template v-for="item of hexaData">
-                    <n-form-item label-placement="left" :label="item.label">
-                      <n-input-group>
-                        <n-popover trigger="hover">
-                          <template #trigger>
-                            <n-input-number min="0" max="10" v-model:value="item.level" />
-                          </template>
-                          <span>填入{{item.label}}的等級</span>
-                        </n-popover>
-                        <n-popover trigger="hover">
-                          <template #trigger>
-                            <n-select v-model:value="item.name" :options="hexaTypesOption" />
-                          </template>
-                          <span>選擇{{item.label}}的類別</span>
-                        </n-popover>
-                      </n-input-group>
-                    </n-form-item>
+                  <template v-for="(data,index) of hexaData">
+                    <n-alert :title="'第'+(index+1)+'顆核心'">
+                      <template v-for="item of data">
+                        <n-form-item label-placement="left" :label="item.label">
+                          <n-input-group>
+                            <n-popover trigger="hover">
+                              <template #trigger>
+                                <n-input-number min="0" max="10" v-model:value="item.level" />
+                              </template>
+                              <span>填入{{item.label}}的等級</span>
+                            </n-popover>
+                            <n-popover trigger="hover">
+                              <template #trigger>
+                                <n-select v-model:value="item.name" :options="hexaTypesOption" />
+                              </template>
+                              <span>選擇{{item.label}}的類別</span>
+                            </n-popover>
+                          </n-input-group>
+                        </n-form-item>
+                      </template>
+                    </n-alert>
                   </template>
 
                   <n-button :loading="calcHexaIng" @click="calcHexaState">

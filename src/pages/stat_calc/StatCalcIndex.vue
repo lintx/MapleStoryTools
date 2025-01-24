@@ -1,7 +1,37 @@
 <script setup>
 import {useRoute, useRouter} from "vue-router";
 import {useMessage} from "naive-ui";
-import {getStore, Stat} from "./store";
+import {getStore, Stat} from "../../components/stat_calc/store.js";
+import {Calculation} from "@vicons/carbon";
+
+
+defineOptions({
+  route:{
+    meta:{
+      icon:Calculation,
+      title:'屬性計算機',
+      desc:'根據角色屬性計算收益等',
+      sort:1,
+    },
+    children:[
+      {
+        path:':index',
+        component:()=>import("/src/components/stat_calc/StatCalc.vue"),
+      },
+      {
+        path:'import/:importData',
+        component:()=>import("./StatCalcIndex.vue"),
+      },
+      {
+        path:'',
+        component:()=>import("./StatCalcIndex.vue"),
+        name:'stat_calc-statcalcindex-index',
+      },
+    ],
+    path:"/stat-calc",
+    component:undefined,
+  }
+})
 
 const store = getStore()
 const route = useRoute()

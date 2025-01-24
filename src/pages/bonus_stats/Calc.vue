@@ -1,4 +1,19 @@
 <script setup>
+
+import {Calculation} from "@vicons/carbon";
+
+defineOptions({
+  route:{
+    meta:{
+      icon:Calculation,
+      title:'星火計算機',
+      desc: '計算裝備星火素質',
+      sort:2,
+    },
+    path:"/bonus-calc",
+  }
+})
+
 function formatFloat(val){
   if (typeof val!=="number") return val
   if (!Number.isFinite(val)) return "∞"

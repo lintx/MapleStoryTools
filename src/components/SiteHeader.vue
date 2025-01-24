@@ -1,7 +1,7 @@
 <template>
   <n-layout-header bordered class="nav" :style="style">
     <n-text tag="div" class="ui-logo" :depth="1" @click="handleLogoClick">
-      <span>MapleStoryTools</span><small>(v0.12.0)</small>
+      <span>MapleStoryTools</span><small>(v0.13.0)</small>
     </n-text>
     <div
         :style="
@@ -91,25 +91,7 @@ function handleLogoClick () {
   router.push('/')
 }
 
-const menuOptions = computed(() => {
-  return [
-    {
-      key: 'home',
-      label: '首頁',
-      path: '/'
-    },
-    {
-      key: 'stat-calc',
-      label: '屬性計算機',
-      path: '/stat-calc'
-    },
-    {
-      key: 'bonus-calc',
-      label: '星火計算機',
-      path: '/bonus-calc'
-    },
-  ]
-})
+const menuOptions = router.options.routes.map(r=>{return {key:r.name,label:r.meta.label,path:r.path,sort:r.meta.sort}}).sort((a,b)=>a.sort-b.sort)
 
 const theme = useTheme()
 const themeName = useThemeName()
@@ -135,7 +117,7 @@ const mobileMenuOptions = computed(() => {
       key: 'theme',
       label: themeLabelMap.value[themeName.value]
     },
-      ...menuOptions.value,
+      ...menuOptions,
     {
       key: 'github',
       label: 'GitHub'
