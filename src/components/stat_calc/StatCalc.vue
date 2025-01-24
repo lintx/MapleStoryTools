@@ -978,7 +978,7 @@ function calcHexaState() {
   }
 
   const sourceStat = hexaStat(dupeObj(currentStat.value.data),hexaData.value,false)
-  console.table(sourceStat)
+  // console.table(sourceStat)
   const sourceResult = calcSourceData(sourceStat)
   hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${numberFormat.value(sourceResult.defBossCriticalDamage)}`
   const deductDiff = currentStatCalcResult.value.defBossCriticalDamage - sourceResult.defBossCriticalDamage
@@ -991,9 +991,9 @@ function calcHexaState() {
     onePlansIndex.push(i)
   }
   const allPlansIndex = allHexaPlan(onePlansIndex,hexaData.value.length)
-  console.log(onePlans)
-  console.log(allPlansIndex)
-  const filterPlans = []
+  // console.log(onePlans)
+  // console.log(allPlansIndex)
+  // const filterPlans = []
   let bestDiff = 0,bestBCD=0,bestCd = []
   for (const planIndexS of allPlansIndex){
     const usedMainNames = []
@@ -1026,10 +1026,10 @@ function calcHexaState() {
       bestDiff = diff
       bestCd = plan
     }
-    filterPlans.push(plan)
+    // filterPlans.push(plan)
   }
-  console.log(filterPlans)
-  console.log(bestCd,bestDiff,bestBCD)
+  // console.log(filterPlans)
+  // console.log(bestCd,bestDiff,bestBCD)
 
   let currentIsBest = true
   for (const [i,item] of hexaData.value.entries()){
