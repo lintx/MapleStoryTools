@@ -21,11 +21,11 @@ import {loadRouter} from "vite-vue-auto-load-router";
 
 const pages = import.meta.glob('@/pages/**/**.vue',{eager:true,import:"default"})
 
-console.log(pages)
+// console.log(pages)
 
 const routes = loadRouter(pages)
 
-console.log(routes)
+// console.log(routes)
 
 const router = createRouter({
     history: createWebHashHistory(),
