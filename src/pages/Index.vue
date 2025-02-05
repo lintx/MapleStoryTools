@@ -28,6 +28,10 @@ const links = [
     title: '秘法符文計算機',
     url: 'https://maplestory-arcane-symbol-calculator.vercel.app/zh-tw',
   },
+  {
+    title: '練功模擬器',
+    url: 'https://maplemaps.net',
+  },
 ]
 
 
