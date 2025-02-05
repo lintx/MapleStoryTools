@@ -830,6 +830,15 @@ function calcHyperState() {
 
 //hexa屬性計算
 const hexaStateLogs = ref(""),calcHexaIng = ref(false)
+const hexaCoreNumsOption = [
+  {label:"已開啟1顆HEXA核心",value:1},
+  {label:"已開啟2顆HEXA核心",value:2},
+  // {label:"已開啟3顆HEXA核心",value:3},
+  // {label:"已開啟4顆HEXA核心",value:4},
+  // {label:"已開啟5顆HEXA核心",value:5},
+  // {label:"已開啟6顆HEXA核心",value:6},
+]
+const hexaCoreNums = ref(1)
 const hexaTypesOption = [
   {label:props["cdR"],value:"cdR"},
   {label:props["bdR"],value:"bdR"},
@@ -838,39 +847,29 @@ const hexaTypesOption = [
   {label:props["pmad"],value:"pmad"},
   {label:props["hexaStat"],value:"hexaStat"},
 ]
-const hexaData = ref([{
-  primary:{
-    level:0,
-    name:"",
-    label:"主要屬性",
-  },
-  secondary1:{
-    level:0,
-    name:"",
-    label:"次要屬性1",
-  },
-  secondary2:{
-    level:0,
-    name:"",
-    label:"次要屬性2",
-  },
-},{
-  primary:{
-    level:0,
-    name:"",
-    label:"主要屬性",
-  },
-  secondary1:{
-    level:0,
-    name:"",
-    label:"次要屬性1",
-  },
-  secondary2:{
-    level:0,
-    name:"",
-    label:"次要屬性2",
-  },
-}])
+const hexaData = ref((()=>{
+  const data = []
+  for(let i=0;i<6;i++){
+    data.push({
+      primary:{
+        level:0,
+        name:"",
+        label:"主要屬性",
+      },
+      secondary1:{
+        level:0,
+        name:"",
+        label:"次要屬性1",
+      },
+      secondary2:{
+        level:0,
+        name:"",
+        label:"次要屬性2",
+      },
+    })
+  }
+  return data
+})())
 
 function hexaStat(source,config,isAdd=true){
   //根據源素質計算hexa加成後的素質
@@ -954,7 +953,8 @@ function calcHexaState() {
   }
 
   const hdns = []
-  for (const data of hexaData.value){
+  const calcHexaData = hexaData.value.slice(0,hexaCoreNums.value)
+  for (const [index,data] of calcHexaData.entries()){
     if (data.primary.name!==""){
       if (hdns.indexOf(data.primary.name) >= 0){
         hexaStateLogs.value += "多顆HEXA屬性核心的主屬性有重複，請檢查是否填寫錯誤"
@@ -966,18 +966,18 @@ function calcHexaState() {
 
     const allLv = data.primary.level + data.secondary1.level + data.secondary2.level
     if (allLv < 1){
-      hexaStateLogs.value += "HEXA屬性核心總等級小於1無法計算"
+      hexaStateLogs.value += `因為第${index+1}顆HEXA屬性核心總等級小於1，所以無法計算`
       calcHexaIng.value = false
       return
     }
     if (allLv > 20){
-      hexaStateLogs.value += "HEXA屬性核心總等級大於20，是否填寫錯誤？"
+      hexaStateLogs.value += `第${index+1}顆HEXA屬性核心總等級大於20，是否填寫錯誤？`
       calcHexaIng.value = false
       return
     }
   }
 
-  const sourceStat = hexaStat(dupeObj(currentStat.value.data),hexaData.value,false)
+  const sourceStat = hexaStat(dupeObj(currentStat.value.data),calcHexaData,false)
   // console.table(sourceStat)
   const sourceResult = calcSourceData(sourceStat)
   hexaStateLogs.value += `扣除當前HEXA屬性後的防後爆B攻為${numberFormat.value(sourceResult.defBossCriticalDamage)}`
@@ -990,7 +990,7 @@ function calcHexaState() {
   for (let i=0,l=onePlans.length;i<l;i++){
     onePlansIndex.push(i)
   }
-  const allPlansIndex = allHexaPlan(onePlansIndex,hexaData.value.length)
+  const allPlansIndex = allHexaPlan(onePlansIndex,calcHexaData.length)
   // console.log(onePlans)
   // console.log(allPlansIndex)
   // const filterPlans = []
@@ -1007,13 +1007,13 @@ function calcHexaState() {
       }
       usedMainNames.push(p[0])
       plan.push({primary:{
-          level:hexaData.value[i].primary.level,
+          level:calcHexaData[i].primary.level,
           name:p[0],
         },secondary1:{
-          level:hexaData.value[i].secondary1.level,
+          level:calcHexaData[i].secondary1.level,
           name:p[1],
         },secondary2:{
-          level:hexaData.value[i].secondary2.level,
+          level:calcHexaData[i].secondary2.level,
           name:p[2],
         },})
     }
@@ -1032,7 +1032,7 @@ function calcHexaState() {
   // console.log(bestCd,bestDiff,bestBCD)
 
   let currentIsBest = true
-  for (const [i,item] of hexaData.value.entries()){
+  for (const [i,item] of calcHexaData.entries()){
     for (const position in item){
       if (item[position].name !== bestCd[i][position].name){
         currentIsBest = false
@@ -1467,9 +1467,17 @@ const statImdR = computed(()=>{
               </n-collapse-item>
               <n-collapse-item title="HEXA屬性" name="4">
                 <n-space vertical>
-                  <template v-for="(data,index) of hexaData">
-                    <n-alert :title="'第'+(index+1)+'顆核心'">
-                      <template v-for="item of data">
+                  <n-alert>
+                    <n-popover trigger="hover">
+                      <template #trigger>
+                        <n-select v-model:value="hexaCoreNums" :options="hexaCoreNumsOption" />
+                      </template>
+                      <span>已開啟核心顆數</span>
+                    </n-popover>
+                  </n-alert>
+                  <template v-for="index in hexaCoreNums">
+                    <n-alert :title="'第'+(index)+'顆核心'">
+                      <template v-for="item of hexaData[index-1]">
                         <n-form-item label-placement="left" :label="item.label">
                           <n-input-group>
                             <n-popover trigger="hover">
